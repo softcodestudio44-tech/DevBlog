@@ -1,0 +1,235 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle, Send, CornerDownRight, Trash2, User } from 'lucide-react';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+
+const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
+  const { user, isAuthenticated } = useAuth();
+  const [replying, setReplying] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [showReplies, setShowReplies] = useState(true);
+
+  const handleReply = async (e) => {
+    e.preventDefault();
+    if (!replyContent.trim()) return;
+
+    try {
+      await api.post(`/posts/${postId}/comments`, {
+        content: replyContent,
+        parentId: comment.id,
+      });
+      setReplyContent('');
+      setReplying(false);
+      onCommentAdded();
+    } catch (error) {
+      console.error('Error adding reply:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this comment?')) return;
+    try {
+      await api.delete(`/posts/${postId}/comments/${comment.id}`);
+      onCommentAdded();
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
+  };
+
+  const isAuthor = user?.id === comment.authorId;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`${depth > 0 ? 'ml-8 border-l-2 border-purple-500/20 pl-4' : ''}`}
+    >
+      <div className="flex gap-3 mb-3">
+        {/* AVATAR WITH IMAGE SUPPORT */}
+        {comment.author?.avatar ? (
+          <img 
+            src={comment.author.avatar} 
+            alt={comment.author.name} 
+            className="w-8 h-8 rounded-full object-cover border border-purple-500/30 flex-shrink-0" 
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+            {comment.author?.name?.[0] || 'U'}
+          </div>
+        )}
+        <div className="flex-grow">
+          <div className="glass p-3 rounded-2xl rounded-tl-none">
+            <div className="flex items-center justify-between mb-1">
+              <Link to={`/user/${comment.authorId}`} className="text-sm font-medium text-purple-300 hover:text-white transition-colors">
+                {comment.author?.name || 'Unknown'}
+              </Link>
+              {isAuthor && (
+                <button
+                  onClick={handleDelete}
+                  className="text-white/30 hover:text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            <p className="text-white/70 text-sm">{comment.content}</p>
+          </div>
+          <div className="flex items-center gap-3 mt-1 ml-1">
+            {isAuthenticated && (
+              <button
+                onClick={() => setReplying(!replying)}
+                className="text-xs text-white/40 hover:text-purple-300 transition-colors flex items-center gap-1"
+              >
+                <CornerDownRight className="w-3 h-3" />
+                Reply
+              </button>
+            )}
+            {comment.replies?.length > 0 && (
+              <button
+                onClick={() => setShowReplies(!showReplies)}
+                className="text-xs text-white/40 hover:text-purple-300 transition-colors"
+              >
+                {showReplies ? 'Hide' : 'Show'} {comment.replies.length} replies
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Reply Form */}
+      <AnimatePresence>
+        {replying && (
+          <motion.form
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            onSubmit={handleReply}
+            className="ml-11 mb-3"
+          >
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Write a reply..."
+                className="input-glass flex-grow text-sm py-2 px-3"
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="p-2 rounded-xl bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      {/* Nested Replies */}
+      <AnimatePresence>
+        {showReplies && comment.replies?.map((reply) => (
+          <CommentItem
+            key={reply.id}
+            comment={reply}
+            postId={postId}
+            onCommentAdded={onCommentAdded}
+            depth={depth + 1}
+          />
+        ))}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const CommentSection = ({ postId }) => {
+  const { isAuthenticated } = useAuth();
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const fetchComments = async () => {
+    try {
+      const response = await api.get(`/posts/${postId}/comments`);
+      setComments(response.data);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [postId]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    setLoading(true);
+    try {
+      await api.post(`/posts/${postId}/comments`, { content: newComment });
+      setNewComment('');
+      fetchComments();
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-8 pt-8 border-t border-white/10">
+      <div className="flex items-center gap-2 mb-6">
+        <MessageCircle className="w-5 h-5 text-purple-400" />
+        <h3 className="text-lg font-semibold">
+          Comments <span className="text-white/40 text-sm">({comments.length})</span>
+        </h3>
+      </div>
+
+      {/* Add Comment */}
+      {isAuthenticated ? (
+        <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center flex-shrink-0">
+            <User className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-grow flex gap-2">
+            <input
+              type="text"
+              placeholder="Add a comment..."
+              className="input-glass flex-grow"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-neon px-4 py-2 disabled:opacity-50"
+            >
+              {loading ? '...' : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="glass p-4 text-center mb-6 text-white/50 text-sm">
+          Please <a href="/login" className="purple-text hover:underline">login</a> to comment
+        </div>
+      )}
+
+      {/* Comments List */}
+      <div className="space-y-4">
+        {comments.map((comment) => (
+          <CommentItem
+            key={comment.id}
+            comment={comment}
+            postId={postId}
+            onCommentAdded={fetchComments}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default CommentSection;

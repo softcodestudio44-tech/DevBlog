@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "cockroachdb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  name      String
+  avatar    String?
+  bio       String?
+  role      String    @default("user")
+  posts     Post[]
+  likes     Like[]
+  comments  Comment[]
+  messages  ChatMessage[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  notifications    Notification[]
+  actorNotifications Notification[] @relation("ActorNotifications")
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  title     String
+  content   String
+  tags      String[]
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes     Like[]
+  comments  Comment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  content   String
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ChatRoom {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  topic     String?
+  messages  ChatMessage[]
+  createdAt DateTime  @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  content   String
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // like, comment, reply, follow, mention
+  message   String
+  read      Boolean  @default(false)
+  sourceId  String?
+  sourceType String?
+  actorId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  actor  User?  @relation("ActorNotifications", fields: [actorId], references: [id])
+
+  @@index([userId])
+  @@index([read])
+}

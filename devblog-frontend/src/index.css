@@ -1,0 +1,264 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --glass-black: rgba(10, 12, 14, 0.75);
+  --glass-dark: rgba(15, 18, 22, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.03);
+  --emerald-glow: #10b981;
+  --emerald-soft: #34d399;
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.5);
+  --text-muted: rgba(255, 255, 255, 0.25);
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #050608;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated mesh gradient background */
+.app-background {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: 
+    radial-gradient(ellipse 60% 40% at 30% 20%, rgba(16, 185, 129, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 50% at 70% 80%, rgba(5, 150, 105, 0.04) 0%, transparent 60%),
+    #050608;
+}
+
+/* Glassmorphism — the core look */
+.glass {
+  background: var(--glass-black);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.glass-strong {
+  background: var(--glass-dark);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Subtle inner glow for cards */
+.glass-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(16, 185, 129, 0.15);
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(16, 185, 129, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Text effects */
+.gradient-text {
+  background: linear-gradient(135deg, #6ee7b7, #34d399, #10b981);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Buttons */
+.btn-neon {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  padding: 12px 32px;
+  border-radius: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-neon:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.12));
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.1);
+  transform: translateY(-1px);
+  color: #a7f3d0;
+}
+
+/* Inputs */
+.input-glass {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 14px 20px;
+  color: var(--text-primary);
+  font-size: 16px;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.input-glass:focus {
+  outline: none;
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.input-glass::placeholder {
+  color: rgba(255, 255, 255, 0.15);
+}
+
+/* Tags */
+.tag {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Typing dots */
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+}
+
+/* Glow orb for AI avatar */
+.glow-orb {
+  background: radial-gradient(circle at 30% 30%, #34d399, #059669);
+  box-shadow: 
+    0 0 30px rgba(16, 185, 129, 0.3),
+    0 0 60px rgba(16, 185, 129, 0.15);
+  animation: orbPulse 3s ease-in-out infinite;
+}
+
+@keyframes orbPulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.3), 0 0 60px rgba(16, 185, 129, 0.15);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.4), 0 0 80px rgba(16, 185, 129, 0.2);
+  }
+}
+
+/* Subtle floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Message bubbles */
+.message-user {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04));
+  border: 1px solid rgba(16, 185, 129, 0.12);
+  border-radius: 18px;
+  border-top-right-radius: 4px;
+}
+
+.message-bot {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 18px;
+  border-top-left-radius: 4px;
+}
+/* Add to the end of your index.css */
+
+/* Sidebar spacing */
+.sidebar-layout {
+  padding-left: 16rem; /* w-64 */
+}
+
+@media (max-width: 1024px) {
+  .sidebar-layout {
+    padding-left: 0;
+    padding-top: 5rem; /* Space for mobile top nav */
+  }
+}
+
+/* Collapsed sidebar */
+.sidebar-collapsed {
+  padding-left: 5rem; /* w-20 */
+}
+/* Ensure content is visible behind sidebar */
+@media (min-width: 1024px) {
+  .lg\:ml-64 {
+    margin-left: 16rem;
+  }
+}
