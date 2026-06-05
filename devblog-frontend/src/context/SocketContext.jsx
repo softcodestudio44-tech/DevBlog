@@ -14,17 +14,18 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     
-    // FORCE polling only - no WebSocket (for mobile hotspot compatibility)
-    const newSocket = io('http://localhost:5000', {
+    const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    
+    const newSocket = io(SOCKET_URL, {
       auth: { token },
-      transports: ['polling'], // ONLY polling, no websocket
+      transports: ['polling', 'websocket'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
       timeout: 20000,
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ Socket connected via polling');
+      console.log('✅ Socket connected');
       setConnected(true);
     });
 
