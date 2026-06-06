@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, Tag, ArrowRight, Sparkles, Code2, Terminal, Braces, Database, Globe, Heart, MessageCircle } from 'lucide-react';
 import api from '../api/axios';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const postsRef = useRef(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +42,18 @@ const Home = () => {
       day: 'numeric',
       year: 'numeric',
     });
+  };
+
+  const handleStartWriting = () => {
+    if (isAuthenticated) {
+      navigate('/create');
+    } else {
+      navigate('/register');
+    }
+  };
+
+  const handleExplorePosts = () => {
+    postsRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const floatingIcons = [
@@ -139,13 +155,19 @@ const Home = () => {
         </motion.div>
 
         <div className="flex gap-4 justify-center">
-          <Link to="/register" className="btn-neon flex items-center gap-2">
+          <button 
+            onClick={handleStartWriting}
+            className="btn-neon flex items-center gap-2"
+          >
             Start Writing
             <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link to="/" className="px-6 py-3 rounded-xl border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-colors">
+          </button>
+          <button 
+            onClick={handleExplorePosts}
+            className="px-6 py-3 rounded-xl border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-colors"
+          >
             Explore Posts
-          </Link>
+          </button>
         </div>
       </motion.div>
 
@@ -175,7 +197,7 @@ const Home = () => {
       </motion.div>
 
       {/* Posts Section */}
-      <div className="max-w-6xl mx-auto">
+      <div ref={postsRef} className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-semibold">Latest Posts</h2>
@@ -201,7 +223,6 @@ const Home = () => {
               <GlassCard key={post.id} delay={index * 0.1}>
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2 mb-4">
-                    {/* AVATAR WITH IMAGE SUPPORT */}
                     {post.author?.avatar ? (
                       <img 
                         src={post.author.avatar} 
