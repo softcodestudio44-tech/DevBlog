@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, ExternalLink } from 'lucide-react';
+import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
@@ -50,6 +50,8 @@ const UserProfile = () => {
           twitter: currentUser?.id === id ? currentUser?.twitter : null,
           linkedin: currentUser?.id === id ? currentUser?.linkedin : null,
           website: currentUser?.id === id ? currentUser?.website : null,
+          tiktok: currentUser?.id === id ? currentUser?.tiktok : null,
+          facebook: currentUser?.id === id ? currentUser?.facebook : null,
           postCount: userPosts.length,
           likeCount: 0,
           commentCount: 0,
@@ -84,6 +86,8 @@ const UserProfile = () => {
     if (type === 'github') return `https://github.com/${url.replace('github.com/', '')}`;
     if (type === 'twitter') return `https://twitter.com/${url.replace('twitter.com/', '')}`;
     if (type === 'linkedin') return `https://linkedin.com/in/${url.replace('linkedin.com/in/', '')}`;
+    if (type === 'tiktok') return `https://tiktok.com/@${url.replace('tiktok.com/@', '')}`;
+    if (type === 'facebook') return `https://facebook.com/${url.replace('facebook.com/', '')}`;
     if (type === 'website') return `https://${url}`;
     return url;
   };
@@ -92,6 +96,8 @@ const UserProfile = () => {
     { key: 'github', label: 'GitHub', icon: Github, color: 'hover:text-white' },
     { key: 'twitter', label: 'Twitter', icon: Twitter, color: 'hover:text-sky-400' },
     { key: 'linkedin', label: 'LinkedIn', icon: Linkedin, color: 'hover:text-blue-400' },
+    { key: 'tiktok', label: 'TikTok', icon: Music2, color: 'hover:text-pink-400' },
+    { key: 'facebook', label: 'Facebook', icon: Facebook, color: 'hover:text-blue-500' },
     { key: 'website', label: 'Website', icon: Globe, color: 'hover:text-emerald-400' },
   ];
 
@@ -118,7 +124,7 @@ const UserProfile = () => {
     );
   }
 
-  const hasSocialLinks = profile.github || profile.twitter || profile.linkedin || profile.website;
+  const hasSocialLinks = profile.github || profile.twitter || profile.linkedin || profile.website || profile.tiktok || profile.facebook;
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-4">

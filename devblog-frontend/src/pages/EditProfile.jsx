@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Camera, Save, ArrowLeft, Upload, X, Github, Twitter, Linkedin, Globe } from 'lucide-react';
+import { User, Camera, Save, ArrowLeft, Upload, X, Github, Twitter, Linkedin, Globe, Music2, Facebook } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,6 +17,8 @@ const EditProfile = () => {
     twitter: user?.twitter || '',
     linkedin: user?.linkedin || '',
     website: user?.website || '',
+    tiktok: user?.tiktok || '',
+    facebook: user?.facebook || '',
   });
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
@@ -99,6 +101,8 @@ const EditProfile = () => {
     { key: 'github', label: 'GitHub', icon: Github, placeholder: 'github.com/username' },
     { key: 'twitter', label: 'Twitter/X', icon: Twitter, placeholder: 'twitter.com/username' },
     { key: 'linkedin', label: 'LinkedIn', icon: Linkedin, placeholder: 'linkedin.com/in/username' },
+    { key: 'tiktok', label: 'TikTok', icon: Music2, placeholder: 'tiktok.com/@username' },
+    { key: 'facebook', label: 'Facebook', icon: Facebook, placeholder: 'facebook.com/username' },
     { key: 'website', label: 'Website', icon: Globe, placeholder: 'yourwebsite.com' },
   ];
 
