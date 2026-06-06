@@ -22,12 +22,16 @@
   --text-muted: rgba(255, 255, 255, 0.25);
 }
 
-body {
+html, body {
   font-family: 'Inter', sans-serif;
   background: #050608;
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  margin: 0;
+  padding: 0;
 }
 
 /* Animated mesh gradient background */
@@ -238,50 +242,38 @@ body {
   border-radius: 18px;
   border-top-left-radius: 4px;
 }
-/* Add to the end of your index.css */
 
 /* Sidebar spacing */
 .sidebar-layout {
-  padding-left: 16rem; /* w-64 */
+  padding-left: 16rem;
 }
 
 @media (max-width: 1024px) {
   .sidebar-layout {
     padding-left: 0;
-    padding-top: 5rem; /* Space for mobile top nav */
+    padding-top: 5rem;
   }
 }
 
 /* Collapsed sidebar */
 .sidebar-collapsed {
-  padding-left: 5rem; /* w-20 */
+  padding-left: 5rem;
 }
+
 /* Ensure content is visible behind sidebar */
 @media (min-width: 1024px) {
   .lg\:ml-64 {
     margin-left: 16rem;
   }
 }
-html, body {
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100vw;
-}
 
-* {
-  box-sizing: border-box;
-}
+/* ========== MOBILE FIXES ========== */
+
 /* Prevent horizontal overflow */
 html, body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
-  margin: 0;
-  padding: 0;
-}
-
-* {
-  box-sizing: border-box;
 }
 
 /* Fix for mobile viewport */
@@ -294,10 +286,11 @@ html, body {
 p, h1, h2, h3, h4, h5, h6 {
   overflow-wrap: break-word;
   word-wrap: break-word;
+  hyphens: auto;
 }
 
 /* Fix images and videos */
-img, video {
+img, video, svg {
   max-width: 100%;
   height: auto;
 }
@@ -307,6 +300,7 @@ pre, code {
   white-space: pre-wrap;
   word-wrap: break-word;
   max-width: 100%;
+  overflow-x: auto;
 }
 
 /* Fix tables */
@@ -323,5 +317,38 @@ table {
 
 /* Fix long URLs and text */
 a {
-  word-break: break-all;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  
+  .glass, .glass-strong, .glass-card {
+    border-radius: 12px;
+  }
+  
+  .btn-neon {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+  
+  .input-glass {
+    padding: 12px 16px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Fix for iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
 }
