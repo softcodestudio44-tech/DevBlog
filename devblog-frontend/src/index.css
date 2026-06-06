@@ -271,3 +271,57 @@ html, body {
 * {
   box-sizing: border-box;
 }
+/* Prevent horizontal overflow */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Fix for mobile viewport */
+@viewport {
+  width: device-width;
+  initial-scale: 1;
+}
+
+/* Prevent text overflow */
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Fix images and videos */
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Fix pre/code blocks */
+pre, code {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-width: 100%;
+}
+
+/* Fix tables */
+table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Fix flex/grid containers */
+.flex, .grid {
+  min-width: 0;
+}
+
+/* Fix long URLs and text */
+a {
+  word-break: break-all;
+}
