@@ -45,7 +45,15 @@ const Navbar = () => {
             </button>
             
             <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="DevBlog" className="w-8 h-8 rounded-lg object-cover" />
+              <img 
+                src="/logo.png?v=3" 
+                alt="DevBlog" 
+                className="w-8 h-8 rounded-lg object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center hidden">
                 <span className="text-white font-bold text-xs">DB</span>
               </div>
@@ -157,7 +165,7 @@ const Navbar = () => {
               <div className="p-5 border-b border-emerald-500/10 flex items-center justify-between">
                 <Link to="/" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
                   <img 
-                    src="/logo.png" 
+                    src="/logo.png?v=3" 
                     alt="DevBlog" 
                     className="w-10 h-10 rounded-xl object-cover"
                     onError={(e) => {
