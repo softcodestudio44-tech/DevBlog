@@ -408,7 +408,7 @@ const Chat = () => {
 
         <div 
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-6 space-y-5"
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-4"
           style={{ scrollBehavior: 'smooth' }}
         >
           {messages.length === 0 && dmUser ? (
@@ -424,33 +424,48 @@ const Chat = () => {
               const showAvatar = index === 0 || messages[index - 1].authorId !== msg.authorId;
 
               return (
-                <div key={msg.id} className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                  {showAvatar && (
-                    <div className="flex-shrink-0">
-                      {msg.author?.avatar ? (
-                        <img src={msg.author.avatar} alt={msg.author.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-emerald-500/15" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
-                          {msg.author?.name?.[0] || 'U'}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {!showAvatar && <div className="w-9 flex-shrink-0" />}
-                  
-                  <div className={`max-w-[75%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
-                    {showAvatar && (
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-white/40">{msg.author?.name}</span>
-                        <span className="text-xs text-white/15">{formatTime(msg.createdAt)}</span>
+                <div key={msg.id} className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex gap-2 max-w-[80%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {/* Avatar - only show on left for others, hide for own messages or use small indicator */}
+                    {showAvatar && !isOwn && (
+                      <div className="flex-shrink-0 self-end">
+                        {msg.author?.avatar ? (
+                          <img src={msg.author.avatar} alt={msg.author.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
+                            {msg.author?.name?.[0] || 'U'}
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div className={`px-4 py-2.5 rounded-2xl ${
-                      isOwn 
-                        ? 'bg-emerald-500/10 border border-emerald-500/15 rounded-tr-sm' 
-                        : 'bg-white/[0.02] border border-white/[0.05] rounded-tl-sm'
-                    }`}>
-                      <p className="text-sm text-white/75 break-words leading-relaxed">{msg.content}</p>
+                    {/* Spacer for own messages to align with avatar width */}
+                    {isOwn && <div className="w-8 flex-shrink-0" />}
+                    
+                    {/* Message Content */}
+                    <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                      {/* Name and time - only show for others */}
+                      {showAvatar && !isOwn && (
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <span className="text-xs font-medium text-white/50">{msg.author?.name}</span>
+                          <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
+                        </div>
+                      )}
+                      {/* Time only for own messages */}
+                      {showAvatar && isOwn && (
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
+                          <span className="text-xs font-medium text-emerald-400/50">You</span>
+                        </div>
+                      )}
+                      
+                      {/* Message Bubble */}
+                      <div className={`px-4 py-2.5 rounded-2xl ${
+                        isOwn 
+                          ? 'bg-emerald-600/20 border border-emerald-500/25 rounded-tr-sm text-white/90' 
+                          : 'bg-white/[0.03] border border-white/[0.06] rounded-tl-sm text-white/75'
+                      }`}>
+                        <p className="text-sm break-words leading-relaxed">{msg.content}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -459,15 +474,19 @@ const Chat = () => {
           )}
 
           {currentTyping.length > 0 && (
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center">
-                <Users className="w-4 h-4 text-white" />
-              </div>
-              <div className="bg-white/[0.02] border border-white/[0.05] px-4 py-2.5 rounded-2xl rounded-tl-sm">
-                <div className="flex items-center gap-1.5">
-                  <div className="typing-dot" />
-                  <div className="typing-dot" />
-                  <div className="typing-dot" />
+            <div className="flex w-full justify-start">
+              <div className="flex gap-2 max-w-[80%]">
+                <div className="flex-shrink-0 self-end">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.05] px-4 py-2.5 rounded-2xl rounded-tl-sm">
+                  <div className="flex items-center gap-1.5">
+                    <div className="typing-dot" />
+                    <div className="typing-dot" />
+                    <div className="typing-dot" />
+                  </div>
                 </div>
               </div>
             </div>
