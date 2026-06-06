@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar } from 'lucide-react';
+import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
@@ -23,7 +23,6 @@ const UserProfile = () => {
     try {
       let userData = null;
       
-      // Try backend API first
       try {
         const userRes = await api.get(`/users/${id}`);
         userData = userRes.data;
@@ -31,7 +30,6 @@ const UserProfile = () => {
         console.log('User API failed, using fallback');
       }
 
-      // Get all posts
       const postsRes = await api.get('/posts');
       const userPosts = postsRes.data.filter((post) => post.authorId === id);
       
@@ -48,6 +46,10 @@ const UserProfile = () => {
           email: author.email || '',
           avatar: author.avatar || currentUser?.avatar || null,
           bio: currentUser?.id === id ? currentUser?.bio : null,
+          github: currentUser?.id === id ? currentUser?.github : null,
+          twitter: currentUser?.id === id ? currentUser?.twitter : null,
+          linkedin: currentUser?.id === id ? currentUser?.linkedin : null,
+          website: currentUser?.id === id ? currentUser?.website : null,
           postCount: userPosts.length,
           likeCount: 0,
           commentCount: 0,
@@ -76,6 +78,23 @@ const UserProfile = () => {
     });
   };
 
+  const getSocialLink = (url, type) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    if (type === 'github') return `https://github.com/${url.replace('github.com/', '')}`;
+    if (type === 'twitter') return `https://twitter.com/${url.replace('twitter.com/', '')}`;
+    if (type === 'linkedin') return `https://linkedin.com/in/${url.replace('linkedin.com/in/', '')}`;
+    if (type === 'website') return `https://${url}`;
+    return url;
+  };
+
+  const socialLinks = [
+    { key: 'github', label: 'GitHub', icon: Github, color: 'hover:text-white' },
+    { key: 'twitter', label: 'Twitter', icon: Twitter, color: 'hover:text-sky-400' },
+    { key: 'linkedin', label: 'LinkedIn', icon: Linkedin, color: 'hover:text-blue-400' },
+    { key: 'website', label: 'Website', icon: Globe, color: 'hover:text-emerald-400' },
+  ];
+
   if (loading) {
     return (
       <div className="min-h-screen pt-24 px-4">
@@ -98,6 +117,8 @@ const UserProfile = () => {
       </div>
     );
   }
+
+  const hasSocialLinks = profile.github || profile.twitter || profile.linkedin || profile.website;
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-4">
@@ -158,6 +179,30 @@ const UserProfile = () => {
                   
                   {profile.bio && (
                     <p className="text-white/70 text-sm max-w-lg mb-4">{profile.bio}</p>
+                  )}
+
+                  {/* Social Links */}
+                  {hasSocialLinks && (
+                    <div className="flex flex-wrap gap-3 mb-4">
+                      {socialLinks.map(({ key, label, icon: Icon, color }) => {
+                        const url = profile[key];
+                        if (!url) return null;
+                        const fullUrl = getSocialLink(url, key);
+                        return (
+                          <a
+                            key={key}
+                            href={fullUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-sm text-white/60 ${color} hover:bg-white/5 transition-all`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span>{label}</span>
+                            <ExternalLink className="w-3 h-3 opacity-50" />
+                          </a>
+                        );
+                      })}
+                    </div>
                   )}
 
                   <div className="flex flex-wrap gap-4 text-sm text-white/40">

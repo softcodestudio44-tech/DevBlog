@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Camera, Save, ArrowLeft, Upload, X } from 'lucide-react';
+import { User, Camera, Save, ArrowLeft, Upload, X, Github, Twitter, Linkedin, Globe } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,7 +12,11 @@ const EditProfile = () => {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     bio: user?.bio || '',
-    avatar: user?.avatar || ''
+    avatar: user?.avatar || '',
+    github: user?.github || '',
+    twitter: user?.twitter || '',
+    linkedin: user?.linkedin || '',
+    website: user?.website || '',
   });
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
@@ -40,19 +44,16 @@ const EditProfile = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file');
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB');
       return;
     }
 
-    // Show preview immediately
     const reader = new FileReader();
     reader.onload = (e) => setPreviewUrl(e.target.result);
     reader.readAsDataURL(file);
@@ -74,7 +75,7 @@ const EditProfile = () => {
     } catch (err) {
       console.error('Upload error:', err);
       setError(err.response?.data?.message || 'Upload failed. Please try again.');
-      setPreviewUrl(user?.avatar || ''); // Revert preview
+      setPreviewUrl(user?.avatar || '');
     } finally {
       setUploadLoading(false);
     }
@@ -92,6 +93,13 @@ const EditProfile = () => {
     `https://api.dicebear.com/7.x/identicon/svg?seed=${formData.name || 'user'}&backgroundColor=ffdfbf`,
     `https://api.dicebear.com/7.x/initials/svg?seed=${formData.name || 'user'}&backgroundColor=d1d4f9`,
     `https://api.dicebear.com/7.x/notionists/svg?seed=${formData.name || 'user'}&backgroundColor=ffd5dc`,
+  ];
+
+  const socialInputs = [
+    { key: 'github', label: 'GitHub', icon: Github, placeholder: 'github.com/username' },
+    { key: 'twitter', label: 'Twitter/X', icon: Twitter, placeholder: 'twitter.com/username' },
+    { key: 'linkedin', label: 'LinkedIn', icon: Linkedin, placeholder: 'linkedin.com/in/username' },
+    { key: 'website', label: 'Website', icon: Globe, placeholder: 'yourwebsite.com' },
   ];
 
   return (
@@ -140,7 +148,6 @@ const EditProfile = () => {
                 </div>
               )}
               
-              {/* Remove button */}
               {(previewUrl || formData.avatar) && (
                 <button
                   onClick={handleRemoveAvatar}
@@ -150,7 +157,6 @@ const EditProfile = () => {
                 </button>
               )}
               
-              {/* Upload button */}
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadLoading}
@@ -173,7 +179,6 @@ const EditProfile = () => {
             </div>
           </div>
 
-          {/* Upload option */}
           <div className="text-center mb-6">
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -243,6 +248,28 @@ const EditProfile = () => {
                 value={formData.bio}
                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
               />
+            </div>
+
+            {/* Social Links */}
+            <div className="border-t border-white/10 pt-6">
+              <h3 className="text-sm font-medium mb-4 text-white/70">Social Links</h3>
+              <div className="space-y-4">
+                {socialInputs.map(({ key, label, icon: Icon, placeholder }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-medium mb-2 text-white/50 flex items-center gap-2">
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </label>
+                    <input
+                      type="text"
+                      className="input-glass"
+                      placeholder={placeholder}
+                      value={formData[key]}
+                      onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button

@@ -1,5 +1,5 @@
 const prisma = require('../config/database');
-const { cloudinary } = require('../config/cloudinary'); // ADD THIS LINE
+const { cloudinary } = require('../config/cloudinary');
 
 const getUserProfile = async (req, res) => {
   try {
@@ -14,6 +14,10 @@ const getUserProfile = async (req, res) => {
         avatar: true,
         bio: true,
         role: true,
+        github: true,
+        twitter: true,
+        linkedin: true,
+        website: true,
         createdAt: true,
       }
     });
@@ -40,17 +44,21 @@ const getUserProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, bio, avatar } = req.body;
+    const { name, bio, avatar, github, twitter, linkedin, website } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.id },
-      data: { name, bio, avatar },
+      data: { name, bio, avatar, github, twitter, linkedin, website },
       select: {
         id: true,
         name: true,
         email: true,
         avatar: true,
         bio: true,
-        role: true
+        role: true,
+        github: true,
+        twitter: true,
+        linkedin: true,
+        website: true,
       }
     });
     res.json({ message: 'Profile updated', user });
@@ -90,14 +98,12 @@ const getUserPosts = async (req, res) => {
   }
 };
 
-// FIXED: Upload buffer to Cloudinary, then save URL
 const uploadAvatar = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No image uploaded' });
     }
 
-    // Upload buffer to Cloudinary
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
@@ -113,7 +119,6 @@ const uploadAvatar = async (req, res) => {
       uploadStream.end(req.file.buffer);
     });
 
-    // Save Cloudinary URL to database
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatar: result.secure_url },
@@ -124,6 +129,10 @@ const uploadAvatar = async (req, res) => {
         avatar: true,
         bio: true,
         role: true,
+        github: true,
+        twitter: true,
+        linkedin: true,
+        website: true,
       },
     });
 
