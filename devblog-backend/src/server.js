@@ -20,26 +20,32 @@ const server = http.createServer(app);
 
 const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
 
+// CORS allowed origins
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'https://devblog-44.vercel.app',
+  'https://dev-blog-woad-seven.vercel.app'
+];
+
+// Express CORS - MUST come BEFORE routes
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+app.use(express.json());
+
+// Socket.IO CORS
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:5173',
-      'https://devblog-44.vercel.app',
-      'https://dev-blog-woad-seven.vercel.app'
-    ],
+    origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  transports: ['polling', 'websocket'],
 });
-
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://devblog-44.vercel.app',
-    'https://dev-blog-woad-seven.vercel.app'
-  ],
-  credentials: true,
-}));
 
 const onlineUsers = new Map();
 
@@ -75,15 +81,19 @@ io.on('connection', (socket) => {
 
   if (socket.user) {
     socket.join(`user:${socket.user.id}`);
+    // Add to online users immediately on connection
+    onlineUsers.set(socket.user.id, {
+      ...socket.user,
+      socketId: socket.id,
+    });
+    // Emit updated online users list
+    io.emit('online-users', Array.from(onlineUsers.values()));
   }
 
   socket.on('join-room', (roomId) => {
     socket.join(roomId);
+    // Re-emit online users when someone joins a room
     if (socket.user) {
-      onlineUsers.set(socket.user.id, {
-        ...socket.user,
-        socketId: socket.id,
-      });
       io.emit('online-users', Array.from(onlineUsers.values()));
     }
   });
@@ -155,6 +165,7 @@ io.on('connection', (socket) => {
         },
       });
 
+      // Emit to both users' personal rooms
       io.to(`user:${socket.user.id}`).to(`user:${recipientId}`).emit('new-dm', {
         ...message,
         roomId: room.id,
@@ -209,9 +220,6 @@ const isAdmin = async (req, res, next) => {
   }
 };
 
-app.use(cors());
-app.use(express.json());
-
 app.delete('/api/admin/chat/clear/:roomId', isAdmin, async (req, res) => {
   try {
     const { roomId } = req.params;
@@ -242,6 +250,7 @@ app.post('/api/admin/make-admin', isAdmin, async (req, res) => {
   }
 });
 
+// Routes - MUST come after CORS
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/likes', likeRoutes);
