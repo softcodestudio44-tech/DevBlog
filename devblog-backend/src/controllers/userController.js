@@ -18,6 +18,8 @@ const getUserProfile = async (req, res) => {
         twitter: true,
         linkedin: true,
         website: true,
+        tiktok: true,
+        facebook: true,
         createdAt: true,
       }
     });
@@ -44,10 +46,10 @@ const getUserProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, bio, avatar, github, twitter, linkedin, website } = req.body;
+    const { name, bio, avatar, github, twitter, linkedin, website, tiktok, facebook } = req.body;
     const user = await prisma.user.update({
       where: { id: req.user.id },
-      data: { name, bio, avatar, github, twitter, linkedin, website },
+      data: { name, bio, avatar, github, twitter, linkedin, website, tiktok, facebook },
       select: {
         id: true,
         name: true,
@@ -59,6 +61,8 @@ const updateProfile = async (req, res) => {
         twitter: true,
         linkedin: true,
         website: true,
+        tiktok: true,
+        facebook: true,
       }
     });
     res.json({ message: 'Profile updated', user });
@@ -133,6 +137,8 @@ const uploadAvatar = async (req, res) => {
         twitter: true,
         linkedin: true,
         website: true,
+        tiktok: true,
+        facebook: true,
       },
     });
 
