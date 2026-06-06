@@ -1,7 +1,7 @@
 {
   "name": "DevBlog",
   "short_name": "DevBlog",
-  "description": "A global platform for developers to share knowledge",
+  "description": "A global platform for developers to share knowledge, collaborate, and grow together.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050608",
@@ -21,6 +21,17 @@
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
