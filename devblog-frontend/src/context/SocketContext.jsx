@@ -88,5 +88,12 @@ export const SocketProvider = ({ children }) => {
     </SocketContext.Provider>
   );
 };
-
+socket.on('new-message', (message) => {
+  // Show browser notification if allowed
+  if (Notification.permission === 'granted') {
+    new Notification('New message from ' + message.author.name, {
+      body: message.content,
+    });
+  }
+});
 export const useSocket = () => useContext(SocketContext);

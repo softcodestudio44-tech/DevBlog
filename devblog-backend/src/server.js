@@ -22,11 +22,24 @@ const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: [
+      'http://localhost:5173',
+      'https://devblog-44.vercel.app',
+      'https://dev-blog-woad-seven.vercel.app'
+    ],
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
+
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://devblog-44.vercel.app',
+    'https://dev-blog-woad-seven.vercel.app'
+  ],
+  credentials: true,
+}));
 
 const onlineUsers = new Map();
 
