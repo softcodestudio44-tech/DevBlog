@@ -45,15 +45,7 @@ const Navbar = () => {
             </button>
             
             <Link to="/" className="flex items-center gap-2.5">
-              <img 
-                src="/logo.png" 
-                alt="DevBlog" 
-                className="w-8 h-8 rounded-lg object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
+              <img src="/logo.png" alt="DevBlog" className="w-8 h-8 rounded-lg object-cover" />
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center hidden">
                 <span className="text-white font-bold text-xs">DB</span>
               </div>
