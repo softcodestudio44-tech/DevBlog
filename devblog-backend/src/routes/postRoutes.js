@@ -1,18 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { getAllPosts, getPostById, createPost, deletePost } = require('../controllers/postController');
-const { getComments, createComment, deleteComment } = require('../controllers/commentController');
+const { 
+  getAllPosts, 
+  getPostById, 
+  createPost, 
+  deletePost, 
+  uploadPostImages 
+} = require('../controllers/postController');
+const upload = require('../middleware/upload');
 
-// Post routes
 router.get('/', getAllPosts);
 router.get('/:id', getPostById);
 router.post('/', protect, createPost);
 router.delete('/:id', protect, deletePost);
 
-// Nested comment routes under posts
-router.get('/:postId/comments', getComments);
-router.post('/:postId/comments', protect, createComment);
-router.delete('/:postId/comments/:id', protect, deleteComment);
+// Upload images - uses multer array for multiple files
+router.post('/upload-images', protect, upload.array('images', 10), uploadPostImages);
 
 module.exports = router;

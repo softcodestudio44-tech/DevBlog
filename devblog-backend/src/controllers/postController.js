@@ -3,7 +3,9 @@ const { cloudinary } = require('../config/cloudinary');
 
 const getAllPosts = async (req, res) => {
   try {
+    // ONLY fetch published posts (not drafts) for public feed
     const posts = await prisma.post.findMany({
+      where: { isDraft: false },
       include: {
         author: { select: { id: true, name: true, email: true, avatar: true } },
       },
@@ -40,6 +42,11 @@ const getPostById = async (req, res) => {
 
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
+    // Don't show drafts to others (only author can see their own draft)
+    if (post.isDraft && (!req.user || req.user.id !== post.authorId)) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
     const likeCount = await prisma.like.count({ where: { postId: post.id } });
     const commentCount = await prisma.comment.count({ where: { postId: post.id } });
 
@@ -56,18 +63,19 @@ const getPostById = async (req, res) => {
 
 const createPost = async (req, res) => {
   try {
-    const { title, content, tags, images } = req.body;
+    const { title, content, tags, images, isDraft } = req.body;
     const post = await prisma.post.create({
       data: {
         title,
         content,
         tags: tags || [],
         images: images || [],
+        isDraft: isDraft || false,
         authorId: req.user.id,
       },
       include: { author: { select: { id: true, name: true, email: true, avatar: true } } },
     });
-    res.status(201).json({ message: 'Post created', post });
+    res.status(201).json({ message: isDraft ? 'Draft saved' : 'Post created', post });
   } catch (error) {
     console.error('createPost error:', error);
     res.status(500).json({ message: error.message });

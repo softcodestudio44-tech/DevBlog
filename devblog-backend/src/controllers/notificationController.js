@@ -92,7 +92,7 @@ const createNotification = async ({ userId, type, message, sourceId, sourceType,
 
     const finalMessage = message.replace('undefined', actorName);
 
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId,
         type,
@@ -102,7 +102,25 @@ const createNotification = async ({ userId, type, message, sourceId, sourceType,
         actorId,
         read: false,
       },
+      include: {
+        actor: {
+          select: { id: true, name: true, avatar: true },
+        },
+      },
     });
+
+    // Emit socket event for real-time notification
+    // We need to get io from the global or pass it somehow
+    // For now, we'll use a global approach
+    const io = global.io;
+    if (io) {
+      io.to(`user:${userId}`).emit('new-notification', {
+        ...notification,
+        message: finalMessage,
+      });
+    }
+
+    return notification;
   } catch (error) {
     console.error('Create notification error:', error);
   }

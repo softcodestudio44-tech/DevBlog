@@ -33,12 +33,14 @@ const getUserProfile = async (req, res) => {
     // Check if this user is admin
     const isAdmin = user.email === ADMIN_EMAIL || user.role === 'admin';
 
-    // Count posts
-    const postCount = await prisma.post.count({ where: { authorId: id } });
+    // Count ONLY published posts (not drafts)
+    const postCount = await prisma.post.count({ 
+      where: { authorId: id, isDraft: false } 
+    });
 
-    // Count total likes RECEIVED on all user's posts
+    // Count total likes RECEIVED on all user's published posts
     const userPosts = await prisma.post.findMany({
-      where: { authorId: id },
+      where: { authorId: id, isDraft: false },
       select: { id: true }
     });
     const postIds = userPosts.map(p => p.id);
@@ -142,8 +144,16 @@ const updateProfile = async (req, res) => {
 const getUserPosts = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Only show published posts on public profile
+    // If viewing own profile, show drafts too
+    const whereClause = { authorId: id };
+    if (!req.user || req.user.id !== id) {
+      whereClause.isDraft = false;
+    }
+
     const posts = await prisma.post.findMany({
-      where: { authorId: id },
+      where: whereClause,
       include: {
         author: { select: { id: true, name: true, avatar: true } },
       },

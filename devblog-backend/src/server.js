@@ -46,8 +46,9 @@ const io = new Server(server, {
   transports: ['polling', 'websocket'],
 });
 
-// Make io accessible to controllers via app.get('io')
+// Make io accessible globally for notification controller
 app.set('io', io);
+global.io = io;
 
 const onlineUsers = new Map();
 
@@ -168,6 +169,17 @@ io.on('connection', (socket) => {
         ...message,
         roomId: room.id,
         roomName: room.name,
+      });
+
+      // Create notification for DM recipient
+      const { createNotification } = require('./controllers/notificationController');
+      await createNotification({
+        userId: recipientId,
+        type: 'message',
+        message: `${socket.user.name} sent you a message`,
+        actorId: socket.user.id,
+        sourceId: room.id,
+        sourceType: 'chat',
       });
     } catch (error) {
       console.error('DM error:', error);
