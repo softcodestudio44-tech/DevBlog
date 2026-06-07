@@ -67,10 +67,11 @@ const EditProfile = () => {
     uploadData.append('avatar', file);
 
     try {
-      const response = await api.post('/users/upload-avatar', uploadData, {
+      // FIXED: Changed from /users/upload-avatar to /users/avatar to match backend route
+      const response = await api.post('/users/avatar', uploadData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
+
       setFormData({ ...formData, avatar: response.data.user.avatar });
       setPreviewUrl(response.data.user.avatar);
       updateUser(response.data.user);
@@ -151,7 +152,7 @@ const EditProfile = () => {
                   {formData.name?.[0] || 'U'}
                 </div>
               )}
-              
+
               {(previewUrl || formData.avatar) && (
                 <button
                   onClick={handleRemoveAvatar}
@@ -160,7 +161,7 @@ const EditProfile = () => {
                   <X className="w-3 h-3 text-white" />
                 </button>
               )}
-              
+
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadLoading}
@@ -172,7 +173,7 @@ const EditProfile = () => {
                   <Camera className="w-5 h-5 text-white" />
                 )}
               </button>
-              
+
               <input
                 ref={fileInputRef}
                 type="file"

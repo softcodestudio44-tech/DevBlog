@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import GlassCard from '../components/GlassCard';
 
 const UserProfile = () => {
   const { id } = useParams();
   const { user: currentUser } = useAuth();
+  const { socket } = useSocket();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,24 @@ const UserProfile = () => {
   useEffect(() => {
     fetchProfileData();
   }, [id]);
+
+  // Listen for real-time follow updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleFollowUpdate = (data) => {
+      if (data.followingId === id || data.followerId === id) {
+        // Refresh profile data when follow/unfollow happens
+        fetchProfileData();
+      }
+    };
+
+    socket.on('follow-update', handleFollowUpdate);
+
+    return () => {
+      socket.off('follow-update', handleFollowUpdate);
+    };
+  }, [socket, id]);
 
   const fetchProfileData = async () => {
     try {
@@ -162,6 +182,15 @@ const UserProfile = () => {
                 <div className="flex-grow min-w-0">
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <h1 className="text-3xl font-bold">{profile.name}</h1>
+
+                    {/* Admin Badge */}
+                    {profile.isAdmin && (
+                      <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+                        <Shield className="w-3 h-3" />
+                        ADMIN
+                      </span>
+                    )}
+
                     {isOwnProfile && (
                       <Link
                         to="/edit-profile"
