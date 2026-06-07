@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowLeft, Heart, MessageCircle, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Clock, Tag, ArrowLeft, Heart, MessageCircle, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
@@ -32,7 +32,7 @@ const PostDetail = () => {
 
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this post?')) return;
-    
+
     try {
       await api.delete(`/posts/${id}`);
       navigate('/');
@@ -50,8 +50,10 @@ const PostDetail = () => {
     });
   };
 
+  // Check if user is author OR admin (by role or email)
   const isAuthor = user?.id === post?.authorId;
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.email === 'softcodestudio44@gmail.com';
+  const canDelete = isAuthor || isAdmin;
 
   if (loading) {
     return (
@@ -68,7 +70,7 @@ const PostDetail = () => {
       <div className="min-h-screen pt-24 px-4 flex items-center justify-center">
         <GlassCard className="text-center py-12">
           <p className="text-white/60 text-lg">Post not found</p>
-          <Link to="/" className="purple-text hover:underline mt-4 inline-block">
+          <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
             Go back home
           </Link>
         </GlassCard>
@@ -84,16 +86,16 @@ const PostDetail = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-white/50 hover:text-purple-300 transition-colors"
+              className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to posts
             </Link>
-            
-            {(isAuthor || isAdmin) && (
+
+            {canDelete && (
               <button
                 onClick={handleDelete}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm"
@@ -110,15 +112,15 @@ const PostDetail = () => {
                 <img 
                   src={post.author.avatar} 
                   alt={post.author.name} 
-                  className="w-12 h-12 rounded-full object-cover border border-purple-500/30" 
+                  className="w-12 h-12 rounded-full object-cover border border-emerald-500/30" 
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-lg font-bold text-white neon-purple-glow">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-lg font-bold text-white">
                   {post.author?.name?.[0] || 'U'}
                 </div>
               )}
               <div>
-                <Link to={`/user/${post.authorId}`} className="font-medium hover:text-purple-300 transition-colors">
+                <Link to={`/user/${post.authorId}`} className="font-medium hover:text-emerald-300 transition-colors">
                   {post.author?.name || 'Unknown'}
                 </Link>
                 <div className="flex items-center gap-1 text-sm text-white/40">
@@ -150,7 +152,7 @@ const PostDetail = () => {
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-6 border-t border-white/10">
+            <div className="flex items-center justify-between pt-6 border-t border-white/10 flex-wrap gap-3">
               <div className="flex gap-2 flex-wrap">
                 {post.tags?.map((tag) => (
                   <span key={tag} className="tag flex items-center gap-1">
