@@ -1,6 +1,8 @@
 const prisma = require('../config/database');
 const { cloudinary } = require('../config/cloudinary');
 
+const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
+
 const getUserProfile = async (req, res) => {
   try {
     const { id } = req.params;
@@ -28,10 +30,13 @@ const getUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Check if this user is admin
+    const isAdmin = user.email === ADMIN_EMAIL || user.role === 'admin';
+
     // Count posts
     const postCount = await prisma.post.count({ where: { authorId: id } });
 
-    // Count total likes RECEIVED on all user's posts (not likes given)
+    // Count total likes RECEIVED on all user's posts
     const userPosts = await prisma.post.findMany({
       where: { authorId: id },
       select: { id: true }
@@ -90,6 +95,7 @@ const getUserProfile = async (req, res) => {
 
     res.json({
       ...user,
+      isAdmin,
       postCount,
       likeCount: totalLikesReceived,
       commentCount,
@@ -210,7 +216,7 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-// Follow a user
+// Follow a user - with socket emission for real-time updates
 const followUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -236,6 +242,16 @@ const followUser = async (req, res) => {
       actorId: followerId,
     });
 
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('follow-update', {
+        followerId,
+        followingId: id,
+        action: 'follow',
+      });
+    }
+
     res.json({ message: 'Followed successfully', follow });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -246,7 +262,7 @@ const followUser = async (req, res) => {
   }
 };
 
-// Unfollow a user
+// Unfollow a user - with socket emission for real-time updates
 const unfollowUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -260,6 +276,16 @@ const unfollowUser = async (req, res) => {
         },
       },
     });
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('follow-update', {
+        followerId,
+        followingId: id,
+        action: 'unfollow',
+      });
+    }
 
     res.json({ message: 'Unfollowed successfully' });
   } catch (error) {

@@ -46,6 +46,9 @@ const io = new Server(server, {
   transports: ['polling', 'websocket'],
 });
 
+// Make io accessible to controllers via app.get('io')
+app.set('io', io);
+
 const onlineUsers = new Map();
 
 io.use(async (socket, next) => {
