@@ -64,6 +64,30 @@ const getUserProfile = async (req, res) => {
       isFollowing = !!follow;
     }
 
+    // Get followers list with basic info (last 10)
+    const followers = await prisma.follow.findMany({
+      where: { followingId: id },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        follower: {
+          select: { id: true, name: true, avatar: true }
+        }
+      }
+    });
+
+    // Get following list with basic info (last 10)
+    const following = await prisma.follow.findMany({
+      where: { followerId: id },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        following: {
+          select: { id: true, name: true, avatar: true }
+        }
+      }
+    });
+
     res.json({
       ...user,
       postCount,
@@ -72,6 +96,8 @@ const getUserProfile = async (req, res) => {
       followersCount,
       followingCount,
       isFollowing,
+      followersList: followers.map(f => f.follower),
+      followingList: following.map(f => f.following),
     });
   } catch (error) {
     console.error('getUserProfile error:', error);
