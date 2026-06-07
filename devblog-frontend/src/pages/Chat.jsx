@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Send, Users, Hash, Circle, Menu, X, ArrowLeft, Trash2 } from 'lucide-react';
+import { MessageCircle, Send, Users, Hash, Circle, Menu, X, Mic, Mail, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -33,7 +33,7 @@ const Chat = () => {
           return [...prev, message];
         });
       });
-
+      
       socket.on('new-dm', (message) => {
         if (dmUser && (message.authorId === dmUser.id || message.authorId === user?.id)) {
           setMessages((prev) => {
@@ -47,7 +47,7 @@ const Chat = () => {
       socket.on('messages-cleared', () => {
         setMessages([]);
       });
-
+      
       return () => {
         socket.off('new-message');
         socket.off('new-dm');
@@ -95,12 +95,12 @@ const Chat = () => {
     setActiveRoom(null);
     setDmUser(targetUser);
     setShowSidebar(false);
-
+    
     const sortedIds = [user.id, targetUser.id].sort();
     const roomName = `dm:${sortedIds[0]}:${sortedIds[1]}`;
-
+    
     joinRoom(roomName);
-
+    
     try {
       const response = await api.get(`/chat/rooms/${roomName}/messages`);
       setMessages(response.data);
@@ -118,7 +118,7 @@ const Chat = () => {
         recipientId: dmUser.id,
         content: newMessage.trim(),
       });
-
+      
       setNewMessage('');
       return;
     }
@@ -139,7 +139,7 @@ const Chat = () => {
   const handleClearChat = async () => {
     if (!activeRoom) return;
     if (!window.confirm('Clear all messages in this room?')) return;
-
+    
     try {
       await api.delete(`/chat/rooms/${activeRoom.id}/clear`);
       setMessages([]);
@@ -176,7 +176,7 @@ const Chat = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[#0a0f0d] overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] bg-[#0a0f0d]">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/[0.02] rounded-full blur-3xl" />
       </div>
@@ -194,7 +194,7 @@ const Chat = () => {
         transition-transform duration-300 ease-in-out
         ${showSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-
+        
         <div className="p-4 border-b border-emerald-500/10 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
@@ -296,6 +296,7 @@ const Chat = () => {
                       </span>
                       <span className="text-[11px] text-white/20 truncate block">Click to message</span>
                     </div>
+                    <Mail className="w-3.5 h-3.5 text-white/10 flex-shrink-0" />
                   </div>
                 </button>
               ))}
@@ -333,8 +334,8 @@ const Chat = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full overflow-hidden">
-
+      <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full">
+        
         {activeRoom && !dmUser && (
           <div className="px-4 py-3 border-b border-emerald-500/10 flex items-center gap-3 flex-shrink-0">
             <button 
@@ -343,11 +344,11 @@ const Chat = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-
+            
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <Hash className="w-4 h-4 text-emerald-400" />
             </div>
-
+            
             <div className="min-w-0">
               <h3 className="font-semibold text-white text-sm">{activeRoom.name}</h3>
               <p className="text-xs text-white/20 truncate">{activeRoom.topic}</p>
@@ -358,7 +359,7 @@ const Chat = () => {
                 <Users className="w-3.5 h-3.5 text-emerald-400/60" />
                 <span className="text-xs text-emerald-400/60">{onlineUsers.length}</span>
               </div>
-
+              
               {isAdmin && (
                 <button
                   onClick={handleClearChat}
@@ -380,14 +381,14 @@ const Chat = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-
+            
             <button 
               onClick={goBackToChannels}
               className="p-2 rounded-lg hover:bg-white/5 text-white/30 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-
+            
             <div className="relative">
               {dmUser.avatar ? (
                 <img src={dmUser.avatar} alt={dmUser.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-emerald-500/20" />
@@ -413,7 +414,7 @@ const Chat = () => {
           {messages.length === 0 && dmUser ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-center mb-4">
-                <MessageCircle className="w-7 h-7 text-emerald-400/30" />
+                <Mail className="w-7 h-7 text-emerald-400/30" />
               </div>
               <p className="text-sm text-white/30">Start a conversation with {dmUser.name}</p>
             </div>
@@ -425,36 +426,38 @@ const Chat = () => {
               return (
                 <div key={msg.id} className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   <div className={`flex gap-2 max-w-[80%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {/* Avatar - show on left for others, small indicator for own */}
-                    {showAvatar && (
+                    {/* Avatar - only show on left for others, hide for own messages or use small indicator */}
+                    {showAvatar && !isOwn && (
                       <div className="flex-shrink-0 self-end">
                         {msg.author?.avatar ? (
-                          <img 
-                            src={msg.author.avatar} 
-                            alt={msg.author.name} 
-                            className={`rounded-full object-cover ring-2 ring-emerald-500/15 ${isOwn ? 'w-6 h-6' : 'w-8 h-8'}`} 
-                          />
+                          <img src={msg.author.avatar} alt={msg.author.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15" />
                         ) : (
-                          <div className={`rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white ${isOwn ? 'w-6 h-6 text-[10px]' : 'w-8 h-8'}`}>
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
                             {msg.author?.name?.[0] || 'U'}
                           </div>
                         )}
                       </div>
                     )}
-                    {!showAvatar && <div className={`flex-shrink-0 ${isOwn ? 'w-6' : 'w-8'}`} />}
-
+                    {/* Spacer for own messages to align with avatar width */}
+                    {isOwn && <div className="w-8 flex-shrink-0" />}
+                    
                     {/* Message Content */}
                     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                      {/* Name and time */}
-                      {showAvatar && (
-                        <div className={`flex items-center gap-2 mb-1 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                          <span className={`text-xs font-medium ${isOwn ? 'text-emerald-400/50' : 'text-white/50'}`}>
-                            {isOwn ? 'You' : msg.author?.name}
-                          </span>
+                      {/* Name and time - only show for others */}
+                      {showAvatar && !isOwn && (
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <span className="text-xs font-medium text-white/50">{msg.author?.name}</span>
                           <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
                         </div>
                       )}
-
+                      {/* Time only for own messages */}
+                      {showAvatar && isOwn && (
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
+                          <span className="text-xs font-medium text-emerald-400/50">You</span>
+                        </div>
+                      )}
+                      
                       {/* Message Bubble */}
                       <div className={`px-4 py-2.5 rounded-2xl ${
                         isOwn 
@@ -505,6 +508,9 @@ const Chat = () => {
                   value={newMessage}
                   onChange={handleTyping}
                 />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/5 text-white/20 hover:text-emerald-400">
+                  <Mic className="w-4 h-4" />
+                </button>
               </div>
               <button
                 type="submit"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink } from 'lucide-react';
 import api from '../api/axios';
@@ -8,70 +8,53 @@ import GlassCard from '../components/GlassCard';
 
 const UserProfile = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   const isOwnProfile = currentUser?.id === id;
 
   useEffect(() => {
-    setProfile(null);
-    setPosts([]);
-    setLoading(true);
-    setError(null);
     fetchProfileData();
-  }, [id]);
+  }, [id, currentUser]);
 
   const fetchProfileData = async () => {
     try {
       let userData = null;
-      let userPosts = [];
-
-      // Try to fetch user profile from API
+      
       try {
         const userRes = await api.get(`/users/${id}`);
         userData = userRes.data;
       } catch (err) {
-        console.log('User API failed, trying fallback');
+        console.log('User API failed, using fallback');
       }
 
-      // Fetch all posts and filter by author
-      try {
-        const postsRes = await api.get('/posts');
-        userPosts = postsRes.data.filter((post) => post.authorId === id);
-      } catch (err) {
-        console.error('Posts fetch error:', err);
-      }
-
+      const postsRes = await api.get('/posts');
+      const userPosts = postsRes.data.filter((post) => post.authorId === id);
+      
       if (userData) {
         setProfile({
           ...userData,
           postCount: userPosts.length,
-          likeCount: userData.likeCount || 0,
-          commentCount: userData.commentCount || 0,
         });
       } else if (userPosts.length > 0) {
-        // Fallback: build profile from post author data
         const author = userPosts[0].author;
         setProfile({
           id: id,
-          name: author?.name || 'Unknown User',
-          email: author?.email || '',
-          avatar: author?.avatar || null,
-          bio: null,
-          github: null,
-          twitter: null,
-          linkedin: null,
-          website: null,
-          tiktok: null,
-          facebook: null,
+          name: author.name,
+          email: author.email || '',
+          avatar: author.avatar || currentUser?.avatar || null,
+          bio: currentUser?.id === id ? currentUser?.bio : null,
+          github: currentUser?.id === id ? currentUser?.github : null,
+          twitter: currentUser?.id === id ? currentUser?.twitter : null,
+          linkedin: currentUser?.id === id ? currentUser?.linkedin : null,
+          website: currentUser?.id === id ? currentUser?.website : null,
+          tiktok: currentUser?.id === id ? currentUser?.tiktok : null,
+          facebook: currentUser?.id === id ? currentUser?.facebook : null,
           postCount: userPosts.length,
           likeCount: 0,
           commentCount: 0,
-          createdAt: new Date().toISOString(),
         });
       } else if (isOwnProfile && currentUser) {
         setProfile({
@@ -80,21 +63,17 @@ const UserProfile = () => {
           likeCount: 0,
           commentCount: 0,
         });
-      } else {
-        setError('User not found');
       }
 
       setPosts(userPosts);
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setError('Failed to load profile');
     } finally {
       setLoading(false);
     }
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Recently';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
@@ -132,12 +111,12 @@ const UserProfile = () => {
     );
   }
 
-  if (error || !profile) {
+  if (!profile) {
     return (
       <div className="min-h-screen pt-24 px-4 flex items-center justify-center">
         <GlassCard className="text-center py-12">
-          <p className="text-white/60 text-lg">{error || 'User not found'}</p>
-          <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
+          <p className="text-white/60 text-lg">User not found</p>
+          <Link to="/" className="purple-text hover:underline mt-4 inline-block">
             Go back home
           </Link>
         </GlassCard>
@@ -156,7 +135,7 @@ const UserProfile = () => {
         >
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-white/50 hover:text-purple-300 transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to posts
@@ -164,8 +143,8 @@ const UserProfile = () => {
 
           {/* Profile Header */}
           <GlassCard className="mb-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-emerald-600/30 to-teal-600/30" />
-
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-purple-600/30 to-cyan-600/30" />
+            
             <div className="relative pt-16 px-4 pb-6">
               <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
                 {/* Avatar */}
@@ -182,7 +161,7 @@ const UserProfile = () => {
                     />
                   ) : null}
                   <div 
-                    className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0F0A1E] shadow-2xl ${profile.avatar ? 'hidden' : ''}`}
+                    className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0F0A1E] shadow-2xl ${profile.avatar ? 'hidden' : ''}`}
                   >
                     {profile.name?.[0] || 'U'}
                   </div>
@@ -190,20 +169,20 @@ const UserProfile = () => {
                 </div>
 
                 {/* Info */}
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <div className="flex-grow">
+                  <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-3xl font-bold">{profile.name}</h1>
                     {isOwnProfile && (
                       <Link
                         to="/edit-profile"
-                        className="p-2 rounded-xl glass hover:bg-emerald-500/20 transition-colors"
+                        className="p-2 rounded-xl glass hover:bg-purple-500/20 transition-colors"
                       >
-                        <Edit3 className="w-4 h-4 text-emerald-300" />
+                        <Edit3 className="w-4 h-4 text-purple-300" />
                       </Link>
                     )}
                   </div>
                   <p className="text-white/50 mb-3">{profile.email}</p>
-
+                  
                   {profile.bio && (
                     <p className="text-white/70 text-sm max-w-lg mb-4">{profile.bio}</p>
                   )}
@@ -235,7 +214,7 @@ const UserProfile = () => {
                   <div className="flex flex-wrap gap-4 text-sm text-white/40">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      Joined {formatDate(profile.createdAt)}
+                      Joined recently
                     </span>
                   </div>
                 </div>
@@ -279,13 +258,13 @@ const UserProfile = () => {
               {posts.map((post, index) => (
                 <GlassCard key={post.id} delay={index * 0.1}>
                   <Link to={`/post/${post.id}`}>
-                    <h3 className="text-lg font-semibold mb-2 hover:text-emerald-300 transition-colors">
+                    <h3 className="text-lg font-semibold mb-2 hover:text-purple-300 transition-colors">
                       {post.title}
                     </h3>
                   </Link>
                   <p className="text-white/50 text-sm mb-3 line-clamp-2">{post.content}</p>
                   <div className="flex items-center justify-between">
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-2">
                       {post.tags?.slice(0, 2).map((tag) => (
                         <span key={tag} className="tag text-xs flex items-center gap-1">
                           <Tag className="w-3 h-3" />
