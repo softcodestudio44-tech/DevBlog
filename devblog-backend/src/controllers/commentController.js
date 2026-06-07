@@ -77,12 +77,22 @@ const createComment = async (req, res) => {
 
 const deleteComment = async (req, res) => {
   try {
-    const { id } = req.params;
-    const comment = await prisma.comment.findUnique({ where: { id } });
+    const { postId, id } = req.params;
+
+    const comment = await prisma.comment.findUnique({ 
+      where: { id },
+      include: { post: { select: { authorId: true } } }
+    });
 
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    if (comment.authorId !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized' });
+
+    // Allow: comment author, post owner, or admin
+    const isCommentAuthor = comment.authorId === req.user.id;
+    const isPostOwner = comment.post.authorId === req.user.id;
+    const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
+
+    if (!isCommentAuthor && !isPostOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to delete this comment' });
     }
 
     await prisma.comment.delete({ where: { id } });

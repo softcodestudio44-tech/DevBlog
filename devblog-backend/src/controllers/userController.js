@@ -4,7 +4,7 @@ const { cloudinary } = require('../config/cloudinary');
 const getUserProfile = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -28,15 +28,50 @@ const getUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Count posts
     const postCount = await prisma.post.count({ where: { authorId: id } });
-    const likeCount = await prisma.like.count({ where: { userId: id } });
+
+    // Count total likes RECEIVED on all user's posts (not likes given)
+    const userPosts = await prisma.post.findMany({
+      where: { authorId: id },
+      select: { id: true }
+    });
+    const postIds = userPosts.map(p => p.id);
+    const totalLikesReceived = postIds.length > 0 
+      ? await prisma.like.count({ where: { postId: { in: postIds } } })
+      : 0;
+
+    // Count comments made by user
     const commentCount = await prisma.comment.count({ where: { authorId: id } });
+
+    // Count followers
+    const followersCount = await prisma.follow.count({ where: { followingId: id } });
+
+    // Count following
+    const followingCount = await prisma.follow.count({ where: { followerId: id } });
+
+    // Check if current user follows this profile
+    let isFollowing = false;
+    if (req.user && req.user.id !== id) {
+      const follow = await prisma.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: req.user.id,
+            followingId: id
+          }
+        }
+      });
+      isFollowing = !!follow;
+    }
 
     res.json({
       ...user,
       postCount,
-      likeCount,
-      commentCount
+      likeCount: totalLikesReceived,
+      commentCount,
+      followersCount,
+      followingCount,
+      isFollowing,
     });
   } catch (error) {
     console.error('getUserProfile error:', error);
@@ -149,4 +184,62 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-module.exports = { getUserProfile, updateProfile, getUserPosts, uploadAvatar };
+// Follow a user
+const followUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const followerId = req.user.id;
+
+    if (followerId === id) {
+      return res.status(400).json({ message: 'Cannot follow yourself' });
+    }
+
+    const follow = await prisma.follow.create({
+      data: {
+        followerId,
+        followingId: id,
+      },
+    });
+
+    // Create notification
+    const { createNotification } = require('./notificationController');
+    await createNotification({
+      userId: id,
+      type: 'follow',
+      message: `${req.user.name} started following you`,
+      actorId: followerId,
+    });
+
+    res.json({ message: 'Followed successfully', follow });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'Already following' });
+    }
+    console.error('Follow error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Unfollow a user
+const unfollowUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const followerId = req.user.id;
+
+    await prisma.follow.delete({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId: id,
+        },
+      },
+    });
+
+    res.json({ message: 'Unfollowed successfully' });
+  } catch (error) {
+    console.error('Unfollow error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getUserProfile, updateProfile, getUserPosts, uploadAvatar, followUser, unfollowUser };

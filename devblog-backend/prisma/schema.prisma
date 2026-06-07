@@ -25,10 +25,28 @@ model User {
   likes     Like[]
   comments  Comment[]
   messages  ChatMessage[]
+
+  // Follow system
+  following Follow[] @relation("UserFollowing")
+  followers Follow[] @relation("UserFollowers")
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   notifications    Notification[]
   actorNotifications Notification[] @relation("ActorNotifications")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
 model Post {
