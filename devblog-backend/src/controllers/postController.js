@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { cloudinary } = require('../config/cloudinary');
 
 const getAllPosts = async (req, res) => {
   try {
@@ -9,7 +10,6 @@ const getAllPosts = async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Get counts manually for CockroachDB compatibility
     const postsWithCounts = await Promise.all(
       posts.map(async (post) => {
         const likeCount = await prisma.like.count({ where: { postId: post.id } });
@@ -56,12 +56,13 @@ const getPostById = async (req, res) => {
 
 const createPost = async (req, res) => {
   try {
-    const { title, content, tags } = req.body;
+    const { title, content, tags, images } = req.body;
     const post = await prisma.post.create({
       data: {
         title,
         content,
         tags: tags || [],
+        images: images || [],
         authorId: req.user.id,
       },
       include: { author: { select: { id: true, name: true, email: true, avatar: true } } },
@@ -90,4 +91,36 @@ const deletePost = async (req, res) => {
   }
 };
 
-module.exports = { getAllPosts, getPostById, createPost, deletePost };
+// Upload post images to Cloudinary
+const uploadPostImages = async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: 'No images uploaded' });
+    }
+
+    const uploadPromises = req.files.map((file) => {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'devblog-posts',
+            transformation: [{ width: 1200, crop: 'limit' }],
+            resource_type: 'image',
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result.secure_url);
+          }
+        );
+        uploadStream.end(file.buffer);
+      });
+    });
+
+    const imageUrls = await Promise.all(uploadPromises);
+    res.json({ images: imageUrls });
+  } catch (error) {
+    console.error('uploadPostImages error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getAllPosts, getPostById, createPost, deletePost, uploadPostImages };

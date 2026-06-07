@@ -1,6 +1,5 @@
 const prisma = require('../config/database');
 
-// Get user's notifications
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -19,18 +18,25 @@ const getNotifications = async (req, res) => {
       },
     });
 
+    // Format notifications with actor name
+    const formattedNotifications = notifications.map((n) => ({
+      ...n,
+      message: n.actor?.name 
+        ? n.message.replace('undefined', n.actor.name)
+        : n.message,
+    }));
+
     const unreadCount = await prisma.notification.count({
       where: { userId, read: false },
     });
 
-    res.json({ notifications, unreadCount });
+    res.json({ notifications: formattedNotifications, unreadCount });
   } catch (error) {
     console.error('Get notifications error:', error);
     res.status(500).json({ message: 'Failed to fetch notifications' });
   }
 };
 
-// Mark notification as read
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
@@ -56,7 +62,6 @@ const markAsRead = async (req, res) => {
   }
 };
 
-// Mark all as read
 const markAllAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -73,14 +78,25 @@ const markAllAsRead = async (req, res) => {
   }
 };
 
-// Create notification (used by other controllers)
 const createNotification = async ({ userId, type, message, sourceId, sourceType, actorId }) => {
   try {
+    // Get actor name for the message
+    let actorName = 'Someone';
+    if (actorId) {
+      const actor = await prisma.user.findUnique({
+        where: { id: actorId },
+        select: { name: true },
+      });
+      actorName = actor?.name || 'Someone';
+    }
+
+    const finalMessage = message.replace('undefined', actorName);
+
     await prisma.notification.create({
       data: {
         userId,
         type,
-        message,
+        message: finalMessage,
         sourceId,
         sourceType,
         actorId,
