@@ -1,6 +1,5 @@
 const prisma = require('../config/database');
 
-// Get user's notifications
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -19,31 +18,13 @@ const getNotifications = async (req, res) => {
       },
     });
 
-    // Format notifications with proper actor names
-    const formattedNotifications = notifications.map((n) => {
-      const actorName = n.actor?.name || 'Someone';
-      let message = n.message;
-
-      // Replace any placeholder with actual actor name
-      if (message.includes('undefined') || message.includes('Someone')) {
-        if (n.type === 'like') {
-          message = `${actorName} liked your post`;
-        } else if (n.type === 'comment') {
-          message = `${actorName} commented on your post`;
-        } else if (n.type === 'reply') {
-          message = `${actorName} replied to your comment`;
-        } else if (n.type === 'follow') {
-          message = `${actorName} started following you`;
-        } else if (n.type === 'mention') {
-          message = `${actorName} mentioned you in a post`;
-        }
-      }
-
-      return {
-        ...n,
-        message,
-      };
-    });
+    // Format notifications with actor name
+    const formattedNotifications = notifications.map((n) => ({
+      ...n,
+      message: n.actor?.name 
+        ? n.message.replace('undefined', n.actor.name)
+        : n.message,
+    }));
 
     const unreadCount = await prisma.notification.count({
       where: { userId, read: false },
@@ -56,7 +37,6 @@ const getNotifications = async (req, res) => {
   }
 };
 
-// Mark notification as read
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
@@ -82,7 +62,6 @@ const markAsRead = async (req, res) => {
   }
 };
 
-// Mark all as read
 const markAllAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -99,7 +78,6 @@ const markAllAsRead = async (req, res) => {
   }
 };
 
-// Create notification (used by other controllers)
 const createNotification = async ({ userId, type, message, sourceId, sourceType, actorId }) => {
   try {
     // Get actor name for the message
@@ -112,23 +90,7 @@ const createNotification = async ({ userId, type, message, sourceId, sourceType,
       actorName = actor?.name || 'Someone';
     }
 
-    // Build proper message based on type
-    let finalMessage = message;
-    if (!message || message.includes('undefined')) {
-      if (type === 'like') {
-        finalMessage = `${actorName} liked your post`;
-      } else if (type === 'comment') {
-        finalMessage = `${actorName} commented on your post`;
-      } else if (type === 'reply') {
-        finalMessage = `${actorName} replied to your comment`;
-      } else if (type === 'follow') {
-        finalMessage = `${actorName} started following you`;
-      } else if (type === 'mention') {
-        finalMessage = `${actorName} mentioned you in a post`;
-      } else {
-        finalMessage = message || `${actorName} interacted with your content`;
-      }
-    }
+    const finalMessage = message.replace('undefined', actorName);
 
     await prisma.notification.create({
       data: {
