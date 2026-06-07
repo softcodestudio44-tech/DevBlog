@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowLeft, Heart, MessageCircle } from 'lucide-react';
+import { Clock, Tag, ArrowLeft, Heart, MessageCircle, Trash2, Image as ImageIcon } from 'lucide-react';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import CommentSection from '../components/CommentSection';
 
 const PostDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,6 +30,18 @@ const PostDetail = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    
+    try {
+      await api.delete(`/posts/${id}`);
+      navigate('/');
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete post');
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'long',
@@ -34,6 +49,9 @@ const PostDetail = () => {
       year: 'numeric',
     });
   };
+
+  const isAuthor = user?.id === post?.authorId;
+  const isAdmin = user?.role === 'admin';
 
   if (loading) {
     return (
@@ -66,17 +84,28 @@ const PostDetail = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-purple-300 transition-colors mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to posts
-          </Link>
+          <div className="flex items-center justify-between mb-6">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 text-white/50 hover:text-purple-300 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to posts
+            </Link>
+            
+            {(isAuthor || isAdmin) && (
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            )}
+          </div>
 
           <GlassCard>
             <div className="flex items-center gap-3 mb-6">
-              {/* AVATAR WITH IMAGE SUPPORT */}
               {post.author?.avatar ? (
                 <img 
                   src={post.author.avatar} 
@@ -100,6 +129,20 @@ const PostDetail = () => {
             </div>
 
             <h1 className="text-3xl font-bold mb-6">{post.title}</h1>
+
+            {/* Post Images */}
+            {post.images && post.images.length > 0 && (
+              <div className="mb-6 space-y-3">
+                {post.images.map((img, i) => (
+                  <img 
+                    key={i} 
+                    src={img} 
+                    alt={`Post image ${i + 1}`} 
+                    className="w-full rounded-xl object-cover max-h-[500px]" 
+                  />
+                ))}
+              </div>
+            )}
 
             <div className="prose prose-invert max-w-none mb-6">
               <p className="text-white/70 leading-relaxed whitespace-pre-wrap">

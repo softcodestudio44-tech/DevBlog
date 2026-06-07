@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Send, Loader2 } from 'lucide-react';
+import { Save, Send, Loader2, Image, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import SEO from '../components/SEO';
@@ -8,13 +8,15 @@ import SEO from '../components/SEO';
 const CreatePost = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
+  const [images, setImages] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
-  // Load draft on mount
   useEffect(() => {
     const draft = localStorage.getItem('postDraft');
     if (draft) {
@@ -22,18 +24,43 @@ const CreatePost = () => {
       setTitle(parsed.title || '');
       setContent(parsed.content || '');
       setTags(parsed.tags || '');
+      setImages(parsed.images || []);
     }
   }, []);
 
-  // Auto-save draft every 3 seconds
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (title || content) {
-        localStorage.setItem('postDraft', JSON.stringify({ title, content, tags }));
+        localStorage.setItem('postDraft', JSON.stringify({ title, content, tags, images }));
       }
     }, 3000);
     return () => clearTimeout(timeout);
-  }, [title, content, tags]);
+  }, [title, content, tags, images]);
+
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setUploadingImages(true);
+    const formData = new FormData();
+    files.forEach((file) => formData.append('images', file));
+
+    try {
+      const response = await api.post('/posts/upload-images', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImages([...images, ...response.data.images]);
+    } catch (error) {
+      console.error('Image upload error:', error);
+      alert('Failed to upload images');
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const removeImage = (index) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
 
   const handlePublish = async (e) => {
     e.preventDefault();
@@ -45,7 +72,7 @@ const CreatePost = () => {
         title,
         content,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-        isDraft: false,
+        images,
       });
       
       localStorage.removeItem('postDraft');
@@ -67,6 +94,7 @@ const CreatePost = () => {
         title,
         content,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+        images,
         isDraft: true,
       });
       
@@ -85,6 +113,7 @@ const CreatePost = () => {
       setTitle('');
       setContent('');
       setTags('');
+      setImages([]);
       localStorage.removeItem('postDraft');
     }
   };
@@ -138,6 +167,46 @@ const CreatePost = () => {
               value={tags}
               onChange={(e) => setTags(e.target.value)}
             />
+            
+            {/* Image Upload */}
+            <div className="glass p-4 rounded-xl">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-white/50">Images ({images.length})</span>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImages}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all text-sm disabled:opacity-30"
+                >
+                  <Image className="w-4 h-4" />
+                  {uploadingImages ? 'Uploading...' : 'Add Images'}
+                </button>
+              </div>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              
+              {images.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {images.map((img, i) => (
+                    <div key={i} className="relative group">
+                      <img src={img} alt={`Upload ${i + 1}`} className="w-full h-32 object-cover rounded-lg" />
+                      <button
+                        onClick={() => removeImage(i)}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             
             <textarea
               placeholder="Write your post content in Markdown..."
