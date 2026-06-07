@@ -1,4 +1,4 @@
-const CACHE_NAME = 'devblog-v3';
+const CACHE_NAME = 'devblog-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -27,8 +27,14 @@ self.addEventListener('activate', (event) => {
 });
 
 // Network-first strategy for HTML, stale-while-revalidate for assets
+// SKIP caching for POST, PUT, DELETE requests
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Don't cache non-GET requests at all
+  if (request.method !== 'GET') {
+    return;
+  }
 
   // For HTML pages - always go to network first
   if (request.mode === 'navigate' || request.destination === 'document') {
