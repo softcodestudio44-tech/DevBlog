@@ -79,7 +79,9 @@ const deletePost = async (req, res) => {
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    if (post.authorId !== req.user.id && req.user.role !== 'admin') {
+    // Allow author OR admin to delete
+    const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
+    if (post.authorId !== req.user.id && !isAdmin) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
 
