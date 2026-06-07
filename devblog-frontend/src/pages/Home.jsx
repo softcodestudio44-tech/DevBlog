@@ -110,7 +110,7 @@ const Home = () => {
           <span className="text-white"> Share.</span>
         </h1>
 
-        <p className="text-lg text-white/50 max-w-2xl mx-auto mb-8 leading-relaxed">
+        <p className="text-lg text-white/60 max-w-2xl mx-auto mb-8 leading-relaxed">
           Join thousands of developers sharing knowledge, tutorials, and insights. 
           Your code journey starts here.
         </p>
@@ -121,7 +121,7 @@ const Home = () => {
             <input
               type="text"
               placeholder="Search posts by title, content, or tags..."
-              className="input-glass w-full pl-12"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 pl-12 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -180,19 +180,19 @@ const Home = () => {
       >
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">1K+</div>
-          <div className="text-sm text-white/50">Developers</div>
+          <div className="text-sm text-white/60">Developers</div>
         </div>
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">500+</div>
-          <div className="text-sm text-white/50">Articles</div>
+          <div className="text-sm text-white/60">Articles</div>
         </div>
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">50+</div>
-          <div className="text-sm text-white/50">Topics</div>
+          <div className="text-sm text-white/60">Topics</div>
         </div>
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">24/7</div>
-          <div className="text-sm text-white/50">Community</div>
+          <div className="text-sm text-white/60">Community</div>
         </div>
       </motion.div>
 
@@ -200,10 +200,10 @@ const Home = () => {
       <div ref={postsRef} className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-2xl font-semibold">Latest Posts</h2>
-            <p className="text-white/40 text-sm mt-1">Fresh from the community</p>
+            <h2 className="text-2xl font-semibold text-white">Latest Posts</h2>
+            <p className="text-white/50 text-sm mt-1">Fresh from the community</p>
           </div>
-          <div className="text-white/40 text-sm">{filteredPosts.length} posts</div>
+          <div className="text-white/50 text-sm">{filteredPosts.length} posts</div>
         </div>
 
         {loading ? (
@@ -221,9 +221,9 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPosts.map((post, index) => (
               <GlassCard key={post.id} delay={index * 0.1}>
-                <div className="flex flex-col h-full">
+                <Link to={`/post/${post.id}`} className="flex flex-col h-full cursor-pointer">
                   <div className="flex items-center gap-2 mb-4">
-                    <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
+                    <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity" onClick={(e) => e.stopPropagation()}>
                       {post.author?.avatar ? (
                         <img 
                           src={post.author.avatar} 
@@ -237,7 +237,7 @@ const Home = () => {
                       )}
                     </Link>
                     <div>
-                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium hover:text-emerald-300 transition-colors">
+                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white/80 hover:text-emerald-300 transition-colors" onClick={(e) => e.stopPropagation()}>
                         {post.author?.name || 'Unknown'}
                       </Link>
                       <div className="flex items-center gap-1 text-xs text-white/40">
@@ -247,8 +247,22 @@ const Home = () => {
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-semibold mb-3 line-clamp-2">{post.title}</h3>
+                  <h3 className="text-xl font-semibold mb-3 text-white line-clamp-2">{post.title}</h3>
                   <p className="text-white/50 text-sm mb-4 line-clamp-3 flex-grow">{post.content}</p>
+
+                  {/* Post Images Preview */}
+                  {post.images && post.images.length > 0 && (
+                    <div className="mb-4">
+                      <img 
+                        src={post.images[0]} 
+                        alt={post.title}
+                        className="w-full h-40 object-cover rounded-lg"
+                      />
+                      {post.images.length > 1 && (
+                        <p className="text-xs text-white/30 mt-1">+{post.images.length - 1} more</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
                     <div className="flex gap-2 flex-wrap">
@@ -260,17 +274,17 @@ const Home = () => {
                       ))}
                     </div>
                     <div className="flex items-center gap-3">
-                      <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
-                      <Link
-                        to={`/post/${post.id}`}
-                        className="flex items-center gap-1 text-white/40 hover:text-emerald-300 transition-colors"
-                      >
+                      <span className="flex items-center gap-1 text-white/40">
+                        <Heart className="w-4 h-4" />
+                        <span className="text-xs">{post.likeCount || 0}</span>
+                      </span>
+                      <span className="flex items-center gap-1 text-white/40">
                         <MessageCircle className="w-4 h-4" />
                         <span className="text-xs">{post.commentCount || 0}</span>
-                      </Link>
+                      </span>
                     </div>
                   </div>
-                </div>
+                </Link>
               </GlassCard>
             ))}
           </div>

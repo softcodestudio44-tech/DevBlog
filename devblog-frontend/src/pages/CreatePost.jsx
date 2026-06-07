@@ -73,10 +73,11 @@ const CreatePost = () => {
         content,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         images,
+        isDraft: false,
       });
-      
+
       localStorage.removeItem('postDraft');
-      navigate(`/post/${response.data.id}`);
+      navigate(`/post/${response.data.post.id}`);
     } catch (error) {
       console.error('Publish error:', error);
       alert('Failed to publish post');
@@ -87,7 +88,7 @@ const CreatePost = () => {
 
   const handleSaveDraft = async () => {
     if (!title.trim()) return;
-    
+
     setSavingDraft(true);
     try {
       await api.post('/posts', {
@@ -97,7 +98,7 @@ const CreatePost = () => {
         images,
         isDraft: true,
       });
-      
+
       localStorage.removeItem('postDraft');
       alert('Draft saved to server!');
     } catch (error) {
@@ -123,19 +124,20 @@ const CreatePost = () => {
       <SEO title="Write Post — DevBlog" description="Create a new blog post" />
       <div className="min-h-screen pt-24 pb-12 px-4" style={{ background: '#050608' }}>
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          {/* Mobile-friendly header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
             <h1 className="text-2xl font-bold text-white">Write Post</h1>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={handleDiscard}
-                className="px-4 py-2 rounded-xl text-sm text-white/30 hover:text-white/60 hover:bg-white/[0.03] transition-all"
+                className="px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/[0.05] transition-all border border-white/10"
               >
                 Discard
               </button>
               <button
                 onClick={handleSaveDraft}
                 disabled={savingDraft || !title.trim()}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm bg-white/[0.03] border border-white/[0.06] text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all disabled:opacity-30"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm bg-white/[0.05] border border-white/10 text-white/70 hover:text-white hover:bg-white/[0.08] transition-all disabled:opacity-30"
               >
                 {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save Draft
@@ -155,33 +157,33 @@ const CreatePost = () => {
             <input
               type="text"
               placeholder="Post title..."
-              className="input-glass text-xl font-semibold py-4"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
-            
+
             <input
               type="text"
               placeholder="Tags (comma separated)..."
-              className="input-glass"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
             />
-            
+
             {/* Image Upload */}
-            <div className="glass p-4 rounded-xl">
+            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-white/50">Images ({images.length})</span>
+                <span className="text-sm text-white/60">Images ({images.length})</span>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImages}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-white/50 hover:text-white/80 hover:bg-white/[0.05] transition-all text-sm disabled:opacity-30"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-sm disabled:opacity-30"
                 >
                   <Image className="w-4 h-4" />
                   {uploadingImages ? 'Uploading...' : 'Add Images'}
                 </button>
               </div>
-              
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -190,9 +192,9 @@ const CreatePost = () => {
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              
+
               {images.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {images.map((img, i) => (
                     <div key={i} className="relative group">
                       <img src={img} alt={`Upload ${i + 1}`} className="w-full h-32 object-cover rounded-lg" />
@@ -207,16 +209,16 @@ const CreatePost = () => {
                 </div>
               )}
             </div>
-            
+
             <textarea
               placeholder="Write your post content in Markdown..."
-              className="input-glass min-h-[400px] resize-y font-mono text-sm leading-relaxed"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
-            
+
             {title && (
-              <p className="text-xs text-white/15">
+              <p className="text-xs text-white/30">
                 Auto-saving to local draft...
               </p>
             )}

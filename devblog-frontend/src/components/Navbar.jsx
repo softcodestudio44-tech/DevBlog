@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PenLine, LogOut, Home, MessageSquare, Sparkles, 
@@ -10,9 +11,33 @@ import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
+  const { socket } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleFollowUpdate = (data) => {
+      // Refresh page data when follow/unfollow happens
+      window.dispatchEvent(new CustomEvent('follow-update', { detail: data }));
+    };
+
+    const handleNewNotification = (data) => {
+      // Refresh notifications when new one arrives
+      window.dispatchEvent(new CustomEvent('new-notification', { detail: data }));
+    };
+
+    socket.on('follow-update', handleFollowUpdate);
+    socket.on('new-notification', handleNewNotification);
+
+    return () => {
+      socket.off('follow-update', handleFollowUpdate);
+      socket.off('new-notification', handleNewNotification);
+    };
+  }, [socket]);
 
   const handleLogout = () => {
     logout();
@@ -34,16 +59,16 @@ const Navbar = () => {
       {/* Top Navigation Bar */}
       <nav className="fixed top-0 left-0 right-0 z-50 h-16">
         <div className="h-full glass-strong px-4 flex items-center justify-between">
-          
+
           {/* Left: Logo + Hamburger */}
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white/40 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white/60 transition-colors"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            
+
             <Link to="/" className="flex items-center gap-2.5">
               <img 
                 src="/logo.png?v=3" 
@@ -78,7 +103,7 @@ const Navbar = () => {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
                   isActive(item.to)
                     ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                    : 'text-white/30 hover:text-white/60 hover:bg-white/[0.02]'
+                    : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
                 }`}
               >
                 <item.icon className="w-4 h-4" />
@@ -91,7 +116,7 @@ const Navbar = () => {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
                   isActive('/create')
                     ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                    : 'text-white/30 hover:text-white/60 hover:bg-white/[0.02]'
+                    : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
                 }`}
               >
                 <PenLine className="w-4 h-4" />
@@ -105,7 +130,7 @@ const Navbar = () => {
             {isAuthenticated ? (
               <>
                 <NotificationBell />
-                
+
                 <Link to={`/user/${user?.id}`} className="flex items-center gap-2 group ml-2">
                   {user?.avatar ? (
                     <img 
@@ -122,7 +147,7 @@ const Navbar = () => {
 
                 <button
                   onClick={handleLogout}
-                  className="hidden sm:flex p-2 rounded-xl hover:bg-white/[0.03] text-white/20 hover:text-red-400/80 transition-all ml-1"
+                  className="hidden sm:flex p-2 rounded-xl hover:bg-white/[0.03] text-white/40 hover:text-red-400/80 transition-all ml-1"
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />
@@ -130,7 +155,7 @@ const Navbar = () => {
               </>
             ) : (
               <div className="flex items-center gap-2">
-                <Link to="/login" className="px-3 py-2 rounded-xl text-sm text-white/30 hover:text-white/60 hover:bg-white/[0.02] transition-all">
+                <Link to="/login" className="px-3 py-2 rounded-xl text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.02] transition-all">
                   Login
                 </Link>
                 <Link to="/register" className="px-3 py-2 rounded-xl text-sm bg-emerald-500/[0.06] border border-emerald-500/15 text-emerald-300/80 hover:bg-emerald-500/[0.1] transition-all">
@@ -153,7 +178,7 @@ const Navbar = () => {
               className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
               onClick={() => setMobileMenuOpen(false)}
             />
-            
+
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
@@ -188,7 +213,7 @@ const Navbar = () => {
                 </Link>
                 <button 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 rounded-lg hover:bg-white/5 text-white/30"
+                  className="p-2 rounded-lg hover:bg-white/5 text-white/40"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -196,8 +221,8 @@ const Navbar = () => {
 
               {/* Mobile Nav Items */}
               <div className="flex-1 p-4 space-y-1 overflow-y-auto">
-                <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-3">Navigation</p>
-                
+                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-3">Navigation</p>
+
                 {navItems.map((item) => (
                   <Link
                     key={item.to}
@@ -206,14 +231,14 @@ const Navbar = () => {
                     className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
                       isActive(item.to)
                         ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                        : 'text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
+                        : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
                     }`}
                   >
                     <item.icon className="w-5 h-5" />
                     <span className="text-sm font-medium">{item.label}</span>
                   </Link>
                 ))}
-                
+
                 {isAuthenticated && (
                   <Link
                     to="/create"
@@ -221,7 +246,7 @@ const Navbar = () => {
                     className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all mt-2 ${
                       isActive('/create')
                         ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                        : 'text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
+                        : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
                     }`}
                   >
                     <PenLine className="w-5 h-5" />
@@ -230,15 +255,15 @@ const Navbar = () => {
                 )}
 
                 <div className="border-t border-white/[0.04] my-4" />
-                
-                <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-3">Account</p>
-                
+
+                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-3">Account</p>
+
                 {isAuthenticated ? (
                   <>
                     <Link
                       to={`/user/${user?.id}`}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-white/40 hover:text-white/70 hover:bg-white/[0.02] transition-all"
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-white/50 hover:text-white/80 hover:bg-white/[0.02] transition-all"
                     >
                       <User className="w-5 h-5" />
                       <span className="text-sm font-medium">Profile</span>
