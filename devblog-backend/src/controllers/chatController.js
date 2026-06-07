@@ -23,12 +23,11 @@ const getMessages = async (req, res) => {
   try {
     const { roomId } = req.params;
 
-    // Try to find room by ID first, then by name
+    // Try to find room by ID first, then by name (for DM rooms)
     let room = await prisma.chatRoom.findUnique({
       where: { id: roomId },
     });
 
-    // If not found by ID, try by name (for DM rooms)
     if (!room) {
       room = await prisma.chatRoom.findUnique({
         where: { name: roomId },
@@ -60,6 +59,64 @@ const getMessages = async (req, res) => {
   }
 };
 
+// Get DM conversation partners for current user
+const getDMHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find all DM rooms where this user is a participant
+    const dmRooms = await prisma.chatRoom.findMany({
+      where: {
+        name: {
+          startsWith: 'dm:',
+        },
+      },
+      include: {
+        messages: {
+          include: {
+            author: { select: { id: true, name: true, avatar: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1, // Get latest message for preview
+        },
+      },
+    });
+
+    // Extract other user IDs from DM room names (dm:user1:user2)
+    const dmPartners = [];
+
+    for (const room of dmRooms) {
+      const parts = room.name.split(':');
+      if (parts.length === 3) {
+        const otherId = parts[1] === userId ? parts[2] : parts[1];
+        if (otherId && otherId !== userId) {
+          // Get user info
+          const otherUser = await prisma.user.findUnique({
+            where: { id: otherId },
+            select: { id: true, name: true, avatar: true },
+          });
+
+          if (otherUser) {
+            dmPartners.push({
+              id: otherUser.id,
+              name: otherUser.name,
+              avatar: otherUser.avatar,
+              roomName: room.name,
+              lastMessage: room.messages[0]?.content || '',
+              lastMessageAt: room.messages[0]?.createdAt || null,
+            });
+          }
+        }
+      }
+    }
+
+    res.json(dmPartners);
+  } catch (error) {
+    console.error('getDMHistory error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const createRoom = async (req, res) => {
   try {
     const { name, topic } = req.body;
@@ -77,7 +134,7 @@ const createRoom = async (req, res) => {
 const clearRoomMessages = async (req, res) => {
   try {
     const { roomId } = req.params;
-    
+
     const room = await prisma.chatRoom.findUnique({
       where: { id: roomId },
     });
@@ -97,4 +154,4 @@ const clearRoomMessages = async (req, res) => {
   }
 };
 
-module.exports = { getRooms, getMessages, createRoom, clearRoomMessages };
+module.exports = { getRooms, getMessages, getDMHistory, createRoom, clearRoomMessages };
