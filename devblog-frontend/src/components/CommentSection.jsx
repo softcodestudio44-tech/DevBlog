@@ -1,3 +1,4 @@
+n.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -5,7 +6,7 @@ import { MessageCircle, Send, CornerDownRight, Trash2, User } from 'lucide-react
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
-const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
+const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 }) => {
   const { user, isAuthenticated } = useAuth();
   const [replying, setReplying] = useState(false);
   const [replyContent, setReplyContent] = useState('');
@@ -38,37 +39,43 @@ const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
     }
   };
 
-  const isAuthor = user?.id === comment.authorId;
+  const isCommentAuthor = user?.id === comment.authorId;
+  const isPostOwner = user?.id === postAuthorId;
+  const isAdmin = user?.role === 'admin' || user?.email === 'softcodestudio44@gmail.com';
+  const canDelete = isCommentAuthor || isPostOwner || isAdmin;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`${depth > 0 ? 'ml-8 border-l-2 border-purple-500/20 pl-4' : ''}`}
+      className={`${depth > 0 ? 'ml-8 border-l-2 border-emerald-500/20 pl-4' : ''}`}
     >
       <div className="flex gap-3 mb-3">
-        {/* AVATAR WITH IMAGE SUPPORT */}
-        {comment.author?.avatar ? (
-          <img 
-            src={comment.author.avatar} 
-            alt={comment.author.name} 
-            className="w-8 h-8 rounded-full object-cover border border-purple-500/30 flex-shrink-0" 
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-            {comment.author?.name?.[0] || 'U'}
-          </div>
-        )}
+        {/* Clickable Avatar */}
+        <Link to={`/user/${comment.authorId}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+          {comment.author?.avatar ? (
+            <img 
+              src={comment.author.avatar} 
+              alt={comment.author.name} 
+              className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+              {comment.author?.name?.[0] || 'U'}
+            </div>
+          )}
+        </Link>
         <div className="flex-grow">
           <div className="glass p-3 rounded-2xl rounded-tl-none">
             <div className="flex items-center justify-between mb-1">
-              <Link to={`/user/${comment.authorId}`} className="text-sm font-medium text-purple-300 hover:text-white transition-colors">
+              <Link to={`/user/${comment.authorId}`} className="text-sm font-medium text-emerald-300 hover:text-white transition-colors">
                 {comment.author?.name || 'Unknown'}
               </Link>
-              {isAuthor && (
+              {canDelete && (
                 <button
                   onClick={handleDelete}
                   className="text-white/30 hover:text-red-400 transition-colors"
+                  title={isPostOwner && !isCommentAuthor ? "Delete as post owner" : "Delete your comment"}
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -80,7 +87,7 @@ const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
             {isAuthenticated && (
               <button
                 onClick={() => setReplying(!replying)}
-                className="text-xs text-white/40 hover:text-purple-300 transition-colors flex items-center gap-1"
+                className="text-xs text-white/40 hover:text-emerald-300 transition-colors flex items-center gap-1"
               >
                 <CornerDownRight className="w-3 h-3" />
                 Reply
@@ -89,7 +96,7 @@ const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
             {comment.replies?.length > 0 && (
               <button
                 onClick={() => setShowReplies(!showReplies)}
-                className="text-xs text-white/40 hover:text-purple-300 transition-colors"
+                className="text-xs text-white/40 hover:text-emerald-300 transition-colors"
               >
                 {showReplies ? 'Hide' : 'Show'} {comment.replies.length} replies
               </button>
@@ -119,7 +126,7 @@ const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
               />
               <button
                 type="submit"
-                className="p-2 rounded-xl bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-colors"
+                className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -135,6 +142,7 @@ const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
             key={reply.id}
             comment={reply}
             postId={postId}
+            postAuthorId={postAuthorId}
             onCommentAdded={onCommentAdded}
             depth={depth + 1}
           />
@@ -144,8 +152,8 @@ const CommentItem = ({ comment, postId, onCommentAdded, depth = 0 }) => {
   );
 };
 
-const CommentSection = ({ postId }) => {
-  const { isAuthenticated } = useAuth();
+const CommentSection = ({ postId, postAuthorId }) => {
+  const { user, isAuthenticated } = useAuth();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -182,7 +190,7 @@ const CommentSection = ({ postId }) => {
   return (
     <div className="mt-8 pt-8 border-t border-white/10">
       <div className="flex items-center gap-2 mb-6">
-        <MessageCircle className="w-5 h-5 text-purple-400" />
+        <MessageCircle className="w-5 h-5 text-emerald-400" />
         <h3 className="text-lg font-semibold">
           Comments <span className="text-white/40 text-sm">({comments.length})</span>
         </h3>
@@ -191,9 +199,15 @@ const CommentSection = ({ postId }) => {
       {/* Add Comment */}
       {isAuthenticated ? (
         <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center flex-shrink-0">
-            <User className="w-4 h-4 text-white" />
-          </div>
+          <Link to={`/user/${user?.id}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+            {user?.avatar ? (
+              <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+                {user?.name?.[0] || 'U'}
+              </div>
+            )}
+          </Link>
           <div className="flex-grow flex gap-2">
             <input
               type="text"
@@ -213,7 +227,7 @@ const CommentSection = ({ postId }) => {
         </form>
       ) : (
         <div className="glass p-4 text-center mb-6 text-white/50 text-sm">
-          Please <a href="/login" className="purple-text hover:underline">login</a> to comment
+          Please <Link to="/login" className="text-emerald-400 hover:underline">login</Link> to comment
         </div>
       )}
 
@@ -224,6 +238,7 @@ const CommentSection = ({ postId }) => {
             key={comment.id}
             comment={comment}
             postId={postId}
+            postAuthorId={postAuthorId}
             onCommentAdded={fetchComments}
           />
         ))}

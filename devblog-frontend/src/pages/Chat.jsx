@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Send, Users, Hash, Circle, Menu, X, Mic, Mail, ArrowLeft, Trash2 } from 'lucide-react';
+import { MessageCircle, Send, Users, Hash, Circle, Menu, X, ArrowLeft, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -16,12 +17,14 @@ const Chat = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [activeTab, setActiveTab] = useState('channels');
   const [dmUser, setDmUser] = useState(null);
+  const [dmHistory, setDmHistory] = useState([]);
   const messagesContainerRef = useRef(null);
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
 
   useEffect(() => {
     fetchRooms();
+    fetchDMHistory();
   }, []);
 
   useEffect(() => {
@@ -33,8 +36,11 @@ const Chat = () => {
           return [...prev, message];
         });
       });
-      
+
       socket.on('new-dm', (message) => {
+        // Refresh DM history to show new conversation
+        fetchDMHistory();
+
         if (dmUser && (message.authorId === dmUser.id || message.authorId === user?.id)) {
           setMessages((prev) => {
             const exists = prev.find(m => m.id === message.id);
@@ -47,7 +53,7 @@ const Chat = () => {
       socket.on('messages-cleared', () => {
         setMessages([]);
       });
-      
+
       return () => {
         socket.off('new-message');
         socket.off('new-dm');
@@ -76,6 +82,16 @@ const Chat = () => {
     }
   };
 
+  const fetchDMHistory = async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await api.get('/chat/dm-history');
+      setDmHistory(response.data);
+    } catch (error) {
+      console.error('Error fetching DM history:', error);
+    }
+  };
+
   const selectRoom = async (room) => {
     if (activeRoom) leaveRoom(activeRoom.id);
     setActiveRoom(room);
@@ -95,12 +111,12 @@ const Chat = () => {
     setActiveRoom(null);
     setDmUser(targetUser);
     setShowSidebar(false);
-    
+
     const sortedIds = [user.id, targetUser.id].sort();
     const roomName = `dm:${sortedIds[0]}:${sortedIds[1]}`;
-    
+
     joinRoom(roomName);
-    
+
     try {
       const response = await api.get(`/chat/rooms/${roomName}/messages`);
       setMessages(response.data);
@@ -118,7 +134,7 @@ const Chat = () => {
         recipientId: dmUser.id,
         content: newMessage.trim(),
       });
-      
+
       setNewMessage('');
       return;
     }
@@ -139,7 +155,7 @@ const Chat = () => {
   const handleClearChat = async () => {
     if (!activeRoom) return;
     if (!window.confirm('Clear all messages in this room?')) return;
-    
+
     try {
       await api.delete(`/chat/rooms/${activeRoom.id}/clear`);
       setMessages([]);
@@ -153,6 +169,10 @@ const Chat = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const isUserOnline = (userId) => {
+    return onlineUsers.some(u => u.id === userId);
   };
 
   const currentTyping = activeRoom ? Object.entries(typingUsers)
@@ -176,7 +196,7 @@ const Chat = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[#0a0f0d]">
+    <div className="flex h-[calc(100vh-64px)] bg-[#0a0f0d] overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/[0.02] rounded-full blur-3xl" />
       </div>
@@ -194,7 +214,7 @@ const Chat = () => {
         transition-transform duration-300 ease-in-out
         ${showSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        
+
         <div className="p-4 border-b border-emerald-500/10 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
@@ -268,8 +288,67 @@ const Chat = () => {
             </div>
           ) : (
             <div className="p-3 space-y-1">
-              <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Online Users</p>
-              {onlineUsers.filter(u => u.id !== user?.id).map((u) => (
+              <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Conversations</p>
+
+              {/* DM History from API */}
+              {dmHistory.map((u) => {
+                const online = isUserOnline(u.id);
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => startDM(u)}
+                    className={`w-full text-left p-3 rounded-xl transition-all ${
+                      dmUser?.id === u.id
+                        ? 'bg-emerald-500/10 border border-emerald-500/20'
+                        : 'hover:bg-white/[0.02] border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-shrink-0">
+                        <Link to={`/user/${u.id}`} onClick={(e) => e.stopPropagation()}>
+                          {u.avatar ? (
+                            <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15 hover:ring-emerald-400 transition-all" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-emerald-600 hover:to-teal-700 transition-all">
+                              {u.name?.[0]}
+                            </div>
+                          )}
+                        </Link>
+                        {online ? (
+                          <Circle className="w-2 h-2 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
+                        ) : (
+                          <Circle className="w-2 h-2 text-white/20 absolute -bottom-0.5 -right-0.5 fill-white/20 stroke-[3]" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <Link 
+                            to={`/user/${u.id}`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className={`text-sm font-medium block truncate hover:text-emerald-300 transition-colors ${dmUser?.id === u.id ? 'text-emerald-300' : 'text-white/60'}`}
+                          >
+                            {u.name}
+                          </Link>
+                        </div>
+                        <span className={`text-[11px] truncate block ${online ? 'text-emerald-400/50' : 'text-white/20'}`}>
+                          {online ? 'Online' : u.lastMessage ? u.lastMessage.substring(0, 20) + (u.lastMessage.length > 20 ? '...' : '') : 'Offline'}
+                        </span>
+                      </div>
+                      <Link 
+                        to={`/user/${u.id}`} 
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-emerald-400 transition-all flex-shrink-0"
+                        title="View profile"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Online users not yet in DM history */}
+              {onlineUsers.filter(u => u.id !== user?.id && !dmHistory.find(d => d.id === u.id)).map((u) => (
                 <button
                   key={u.id}
                   onClick={() => startDM(u)}
@@ -281,40 +360,55 @@ const Chat = () => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative flex-shrink-0">
-                      {u.avatar ? (
-                        <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white">
-                          {u.name?.[0]}
-                        </div>
-                      )}
+                      <Link to={`/user/${u.id}`} onClick={(e) => e.stopPropagation()}>
+                        {u.avatar ? (
+                          <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15 hover:ring-emerald-400 transition-all" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-emerald-600 hover:to-teal-700 transition-all">
+                            {u.name?.[0]}
+                          </div>
+                        )}
+                      </Link>
                       <Circle className="w-2 h-2 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
                     </div>
-                    <div className="min-w-0">
-                      <span className={`text-sm font-medium block truncate ${dmUser?.id === u.id ? 'text-emerald-300' : 'text-white/60'}`}>
+                    <div className="min-w-0 flex-1">
+                      <Link 
+                        to={`/user/${u.id}`} 
+                        onClick={(e) => e.stopPropagation()}
+                        className={`text-sm font-medium block truncate hover:text-emerald-300 transition-colors ${dmUser?.id === u.id ? 'text-emerald-300' : 'text-white/60'}`}
+                      >
                         {u.name}
-                      </span>
-                      <span className="text-[11px] text-white/20 truncate block">Click to message</span>
+                      </Link>
+                      <span className="text-[11px] text-emerald-400/50 truncate block">Online</span>
                     </div>
-                    <Mail className="w-3.5 h-3.5 text-white/10 flex-shrink-0" />
+                    <Link 
+                      to={`/user/${u.id}`} 
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-emerald-400 transition-all flex-shrink-0"
+                      title="View profile"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </button>
               ))}
-              {onlineUsers.filter(u => u.id !== user?.id).length === 0 && (
-                <p className="text-xs text-white/20 text-center py-8">No users online</p>
+
+              {dmHistory.length === 0 && onlineUsers.filter(u => u.id !== user?.id).length === 0 && (
+                <p className="text-xs text-white/20 text-center py-8">No conversations yet. Start messaging someone!</p>
               )}
             </div>
           )}
         </div>
 
         <div className="p-4 border-t border-emerald-500/10 flex-shrink-0">
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider mb-3">Online</p>
+          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider mb-3">Online Now</p>
           <div className="flex -space-x-2">
             {onlineUsers.filter(u => u.id !== user?.id).slice(0, 5).map((u) => (
-              <button
+              <Link
                 key={u.id}
-                onClick={() => startDM(u)}
+                to={`/user/${u.id}`}
                 className="relative hover:z-10 transition-transform hover:scale-110"
+                title={u.name}
               >
                 {u.avatar ? (
                   <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-900" />
@@ -323,7 +417,7 @@ const Chat = () => {
                     {u.name?.[0]}
                   </div>
                 )}
-              </button>
+              </Link>
             ))}
             {onlineUsers.filter(u => u.id !== user?.id).length > 5 && (
               <div className="w-8 h-8 rounded-full bg-white/5 border-2 border-slate-900 flex items-center justify-center text-xs text-slate-400">
@@ -334,8 +428,8 @@ const Chat = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full">
-        
+      <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full overflow-hidden">
+
         {activeRoom && !dmUser && (
           <div className="px-4 py-3 border-b border-emerald-500/10 flex items-center gap-3 flex-shrink-0">
             <button 
@@ -344,11 +438,11 @@ const Chat = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-            
+
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <Hash className="w-4 h-4 text-emerald-400" />
             </div>
-            
+
             <div className="min-w-0">
               <h3 className="font-semibold text-white text-sm">{activeRoom.name}</h3>
               <p className="text-xs text-white/20 truncate">{activeRoom.topic}</p>
@@ -359,7 +453,7 @@ const Chat = () => {
                 <Users className="w-3.5 h-3.5 text-emerald-400/60" />
                 <span className="text-xs text-emerald-400/60">{onlineUsers.length}</span>
               </div>
-              
+
               {isAdmin && (
                 <button
                   onClick={handleClearChat}
@@ -381,15 +475,15 @@ const Chat = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-            
+
             <button 
               onClick={goBackToChannels}
               className="p-2 rounded-lg hover:bg-white/5 text-white/30 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            
-            <div className="relative">
+
+            <Link to={`/user/${dmUser.id}`} className="relative hover:opacity-80 transition-opacity">
               {dmUser.avatar ? (
                 <img src={dmUser.avatar} alt={dmUser.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-emerald-500/20" />
               ) : (
@@ -397,11 +491,19 @@ const Chat = () => {
                   {dmUser.name?.[0]}
                 </div>
               )}
-              <Circle className="w-2.5 h-2.5 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
-            </div>
+              {isUserOnline(dmUser.id) ? (
+                <Circle className="w-2.5 h-2.5 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
+              ) : (
+                <Circle className="w-2.5 h-2.5 text-white/20 absolute -bottom-0.5 -right-0.5 fill-white/20 stroke-[3]" />
+              )}
+            </Link>
             <div className="min-w-0">
-              <h3 className="font-semibold text-white text-sm">{dmUser.name}</h3>
-              <p className="text-xs text-emerald-400/50">Direct Message</p>
+              <Link to={`/user/${dmUser.id}`} className="font-semibold text-white text-sm hover:text-emerald-300 transition-colors">
+                {dmUser.name}
+              </Link>
+              <p className="text-xs text-emerald-400/50">
+                {isUserOnline(dmUser.id) ? 'Online' : 'Offline'}
+              </p>
             </div>
           </div>
         )}
@@ -414,9 +516,12 @@ const Chat = () => {
           {messages.length === 0 && dmUser ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-center mb-4">
-                <Mail className="w-7 h-7 text-emerald-400/30" />
+                <MessageCircle className="w-7 h-7 text-emerald-400/30" />
               </div>
               <p className="text-sm text-white/30">Start a conversation with {dmUser.name}</p>
+              <Link to={`/user/${dmUser.id}`} className="text-xs text-emerald-400/50 hover:text-emerald-300 mt-2 transition-colors">
+                View profile →
+              </Link>
             </div>
           ) : (
             messages.map((msg, index) => {
@@ -426,38 +531,39 @@ const Chat = () => {
               return (
                 <div key={msg.id} className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   <div className={`flex gap-2 max-w-[80%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {/* Avatar - only show on left for others, hide for own messages or use small indicator */}
+                    {/* Avatar - clickable to profile */}
                     {showAvatar && !isOwn && (
-                      <div className="flex-shrink-0 self-end">
+                      <Link to={`/user/${msg.authorId}`} className="flex-shrink-0 self-end hover:opacity-80 transition-opacity">
                         {msg.author?.avatar ? (
-                          <img src={msg.author.avatar} alt={msg.author.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15" />
+                          <img 
+                            src={msg.author.avatar} 
+                            alt={msg.author.name} 
+                            className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15" 
+                          />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
                             {msg.author?.name?.[0] || 'U'}
                           </div>
                         )}
-                      </div>
+                      </Link>
                     )}
-                    {/* Spacer for own messages to align with avatar width */}
                     {isOwn && <div className="w-8 flex-shrink-0" />}
-                    
+
                     {/* Message Content */}
                     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                      {/* Name and time - only show for others */}
-                      {showAvatar && !isOwn && (
-                        <div className="flex items-center gap-2 mb-1 px-1">
-                          <span className="text-xs font-medium text-white/50">{msg.author?.name}</span>
+                      {/* Name and time - clickable */}
+                      {showAvatar && (
+                        <div className={`flex items-center gap-2 mb-1 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                          {!isOwn && (
+                            <Link to={`/user/${msg.authorId}`} className="text-xs font-medium text-white/50 hover:text-emerald-300 transition-colors">
+                              {msg.author?.name}
+                            </Link>
+                          )}
                           <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
+                          {isOwn && <span className="text-xs font-medium text-emerald-400/50">You</span>}
                         </div>
                       )}
-                      {/* Time only for own messages */}
-                      {showAvatar && isOwn && (
-                        <div className="flex items-center gap-2 mb-1 px-1">
-                          <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
-                          <span className="text-xs font-medium text-emerald-400/50">You</span>
-                        </div>
-                      )}
-                      
+
                       {/* Message Bubble */}
                       <div className={`px-4 py-2.5 rounded-2xl ${
                         isOwn 
@@ -508,9 +614,6 @@ const Chat = () => {
                   value={newMessage}
                   onChange={handleTyping}
                 />
-                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/5 text-white/20 hover:text-emerald-400">
-                  <Mic className="w-4 h-4" />
-                </button>
               </div>
               <button
                 type="submit"

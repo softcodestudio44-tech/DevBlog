@@ -83,7 +83,7 @@ const Home = () => {
             ease: 'easeInOut',
           }}
         >
-          <Icon className="w-12 h-12 text-purple-400" />
+          <Icon className="w-12 h-12 text-emerald-400" />
         </motion.div>
       ))}
 
@@ -98,10 +98,10 @@ const Home = () => {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-6 border-purple-500/30"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-6 border-emerald-500/30"
         >
-          <Sparkles className="w-4 h-4 text-cyan-400" />
-          <span className="text-sm purple-text font-medium">Developer Community</span>
+          <Sparkles className="w-4 h-4 text-emerald-400" />
+          <span className="text-sm text-emerald-300 font-medium">Developer Community</span>
         </motion.div>
 
         <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
@@ -142,7 +142,7 @@ const Home = () => {
             <div className="w-3 h-3 rounded-full bg-green-500" />
             <span className="text-xs text-white/40 ml-2 font-mono">devblog.js</span>
           </div>
-          <pre className="font-mono text-sm text-purple-300 overflow-x-auto">
+          <pre className="font-mono text-sm text-emerald-300 overflow-x-auto">
             <code>{`const developer = {
   name: "You",
   passion: "Building things",
@@ -164,7 +164,7 @@ const Home = () => {
           </button>
           <button 
             onClick={handleExplorePosts}
-            className="px-6 py-3 rounded-xl border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-colors"
+            className="px-6 py-3 rounded-xl border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
           >
             Explore Posts
           </button>
@@ -214,7 +214,7 @@ const Home = () => {
           </div>
         ) : filteredPosts.length === 0 ? (
           <GlassCard className="text-center py-16">
-            <Code2 className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+            <Code2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
             <p className="text-white/60 text-lg">No posts found. Try a different search!</p>
           </GlassCard>
         ) : (
@@ -223,19 +223,21 @@ const Home = () => {
               <GlassCard key={post.id} delay={index * 0.1}>
                 <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2 mb-4">
-                    {post.author?.avatar ? (
-                      <img 
-                        src={post.author.avatar} 
-                        alt={post.author.name} 
-                        className="w-8 h-8 rounded-full object-cover border border-purple-500/30" 
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-xs font-bold text-white neon-purple-glow">
-                        {post.author?.name?.[0] || 'U'}
-                      </div>
-                    )}
+                    <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
+                      {post.author?.avatar ? (
+                        <img 
+                          src={post.author.avatar} 
+                          alt={post.author.name} 
+                          className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+                          {post.author?.name?.[0] || 'U'}
+                        </div>
+                      )}
+                    </Link>
                     <div>
-                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium hover:text-purple-300 transition-colors">
+                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium hover:text-emerald-300 transition-colors">
                         {post.author?.name || 'Unknown'}
                       </Link>
                       <div className="flex items-center gap-1 text-xs text-white/40">
@@ -261,7 +263,7 @@ const Home = () => {
                       <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
                       <Link
                         to={`/post/${post.id}`}
-                        className="flex items-center gap-1 text-white/40 hover:text-purple-300 transition-colors"
+                        className="flex items-center gap-1 text-white/40 hover:text-emerald-300 transition-colors"
                       >
                         <MessageCircle className="w-4 h-4" />
                         <span className="text-xs">{post.commentCount || 0}</span>
