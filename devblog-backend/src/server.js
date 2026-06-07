@@ -7,7 +7,6 @@ const { Server } = require('socket.io');
 const authRoutes = require('./routes/authRoutes');
 const postRoutes = require('./routes/postRoutes');
 const likeRoutes = require('./routes/likeRoutes');
-const commentRoutes = require('./routes/commentRoutes');
 const userRoutes = require('./routes/userRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const aiRoutes = require('./routes/aiRoutes');
@@ -56,18 +55,18 @@ io.use(async (socket, next) => {
       socket.user = null;
       return next();
     }
-    
+
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, name: true, avatar: true, email: true, role: true },
     });
-    
+
     if (user && user.email === ADMIN_EMAIL) {
       user.isAdmin = true;
     }
-    
+
     socket.user = user;
     next();
   } catch (err) {
@@ -81,18 +80,15 @@ io.on('connection', (socket) => {
 
   if (socket.user) {
     socket.join(`user:${socket.user.id}`);
-    // Add to online users immediately on connection
     onlineUsers.set(socket.user.id, {
       ...socket.user,
       socketId: socket.id,
     });
-    // Emit updated online users list
     io.emit('online-users', Array.from(onlineUsers.values()));
   }
 
   socket.on('join-room', (roomId) => {
     socket.join(roomId);
-    // Re-emit online users when someone joins a room
     if (socket.user) {
       io.emit('online-users', Array.from(onlineUsers.values()));
     }
@@ -105,7 +101,7 @@ io.on('connection', (socket) => {
   socket.on('send-message', async (data) => {
     try {
       const { roomId, content } = data;
-      
+
       if (!socket.user) {
         socket.emit('error', { message: 'Not authenticated' });
         return;
@@ -132,7 +128,7 @@ io.on('connection', (socket) => {
   socket.on('send-dm', async (data) => {
     try {
       const { recipientId, content } = data;
-      
+
       if (!socket.user) {
         socket.emit('error', { message: 'Not authenticated' });
         return;
@@ -165,7 +161,6 @@ io.on('connection', (socket) => {
         },
       });
 
-      // Emit to both users' personal rooms
       io.to(`user:${socket.user.id}`).to(`user:${recipientId}`).emit('new-dm', {
         ...message,
         roomId: room.id,
@@ -201,19 +196,19 @@ const isAdmin = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token' });
-    
+
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { email: true },
     });
-    
+
     if (user?.email === ADMIN_EMAIL) {
       req.isAdmin = true;
       return next();
     }
-    
+
     res.status(403).json({ message: 'Admin only' });
   } catch (err) {
     res.status(401).json({ message: 'Invalid token' });
@@ -223,13 +218,13 @@ const isAdmin = async (req, res, next) => {
 app.delete('/api/admin/chat/clear/:roomId', isAdmin, async (req, res) => {
   try {
     const { roomId } = req.params;
-    
+
     await prisma.chatMessage.deleteMany({
       where: { roomId },
     });
-    
+
     io.to(roomId).emit('messages-cleared', { roomId });
-    
+
     res.json({ message: 'Chat cleared successfully' });
   } catch (error) {
     console.error('Clear chat error:', error);
@@ -254,7 +249,6 @@ app.post('/api/admin/make-admin', isAdmin, async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/likes', likeRoutes);
-app.use('/api/comments', commentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/ai', aiRoutes);
