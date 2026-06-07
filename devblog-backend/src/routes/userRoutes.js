@@ -1,20 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
 const { 
   getUserProfile, 
   updateProfile, 
   getUserPosts, 
-  uploadAvatar,
-  followUser,
+  uploadAvatar, 
+  followUser, 
   unfollowUser 
 } = require('../controllers/userController');
+const upload = require('../middleware/upload');
 
-router.get('/:id', getUserProfile);
+// Get user profile - protected so isFollowing works
+router.get('/:id', protect, getUserProfile);
+
+// Get user posts - public
 router.get('/:id/posts', getUserPosts);
+
+// Update profile - protected
 router.put('/profile', protect, updateProfile);
-router.post('/upload-avatar', protect, upload.single('avatar'), uploadAvatar);
+
+// Upload avatar - protected
+router.post('/avatar', protect, upload.single('avatar'), uploadAvatar);
+
+// Follow/unfollow - protected
 router.post('/:id/follow', protect, followUser);
 router.post('/:id/unfollow', protect, unfollowUser);
 
