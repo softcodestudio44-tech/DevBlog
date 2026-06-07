@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink } from 'lucide-react';
+import { Clock, Tag, ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
@@ -12,60 +12,27 @@ const UserProfile = () => {
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const isOwnProfile = currentUser?.id === id;
 
   useEffect(() => {
     fetchProfileData();
-  }, [id, currentUser]);
+  }, [id]);
 
   const fetchProfileData = async () => {
     try {
-      let userData = null;
-      
-      try {
-        const userRes = await api.get(`/users/${id}`);
-        userData = userRes.data;
-      } catch (err) {
-        console.log('User API failed, using fallback');
-      }
+      setLoading(true);
 
-      const postsRes = await api.get('/posts');
-      const userPosts = postsRes.data.filter((post) => post.authorId === id);
-      
-      if (userData) {
-        setProfile({
-          ...userData,
-          postCount: userPosts.length,
-        });
-      } else if (userPosts.length > 0) {
-        const author = userPosts[0].author;
-        setProfile({
-          id: id,
-          name: author.name,
-          email: author.email || '',
-          avatar: author.avatar || currentUser?.avatar || null,
-          bio: currentUser?.id === id ? currentUser?.bio : null,
-          github: currentUser?.id === id ? currentUser?.github : null,
-          twitter: currentUser?.id === id ? currentUser?.twitter : null,
-          linkedin: currentUser?.id === id ? currentUser?.linkedin : null,
-          website: currentUser?.id === id ? currentUser?.website : null,
-          tiktok: currentUser?.id === id ? currentUser?.tiktok : null,
-          facebook: currentUser?.id === id ? currentUser?.facebook : null,
-          postCount: userPosts.length,
-          likeCount: 0,
-          commentCount: 0,
-        });
-      } else if (isOwnProfile && currentUser) {
-        setProfile({
-          ...currentUser,
-          postCount: 0,
-          likeCount: 0,
-          commentCount: 0,
-        });
-      }
+      // Fetch profile
+      const userRes = await api.get(`/users/${id}`);
+      const userData = userRes.data;
 
-      setPosts(userPosts);
+      // Fetch user's posts
+      const postsRes = await api.get(`/users/${id}/posts`);
+
+      setProfile(userData);
+      setPosts(postsRes.data);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -73,7 +40,35 @@ const UserProfile = () => {
     }
   };
 
+  const handleFollow = async () => {
+    if (!currentUser || isOwnProfile) return;
+
+    setFollowLoading(true);
+    try {
+      if (profile.isFollowing) {
+        await api.post(`/users/${id}/unfollow`);
+        setProfile(prev => ({
+          ...prev,
+          isFollowing: false,
+          followersCount: prev.followersCount - 1,
+        }));
+      } else {
+        await api.post(`/users/${id}/follow`);
+        setProfile(prev => ({
+          ...prev,
+          isFollowing: true,
+          followersCount: prev.followersCount + 1,
+        }));
+      }
+    } catch (error) {
+      console.error('Follow error:', error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const formatDate = (dateString) => {
+    if (!dateString) return 'Recently';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
@@ -116,7 +111,7 @@ const UserProfile = () => {
       <div className="min-h-screen pt-24 px-4 flex items-center justify-center">
         <GlassCard className="text-center py-12">
           <p className="text-white/60 text-lg">User not found</p>
-          <Link to="/" className="purple-text hover:underline mt-4 inline-block">
+          <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
             Go back home
           </Link>
         </GlassCard>
@@ -135,7 +130,7 @@ const UserProfile = () => {
         >
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-purple-300 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to posts
@@ -143,8 +138,8 @@ const UserProfile = () => {
 
           {/* Profile Header */}
           <GlassCard className="mb-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-purple-600/30 to-cyan-600/30" />
-            
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-emerald-600/30 to-teal-600/30" />
+
             <div className="relative pt-16 px-4 pb-6">
               <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
                 {/* Avatar */}
@@ -161,7 +156,7 @@ const UserProfile = () => {
                     />
                   ) : null}
                   <div 
-                    className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0F0A1E] shadow-2xl ${profile.avatar ? 'hidden' : ''}`}
+                    className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0F0A1E] shadow-2xl ${profile.avatar ? 'hidden' : ''}`}
                   >
                     {profile.name?.[0] || 'U'}
                   </div>
@@ -169,22 +164,47 @@ const UserProfile = () => {
                 </div>
 
                 {/* Info */}
-                <div className="flex-grow">
-                  <div className="flex items-center gap-3 mb-2">
+                <div className="flex-grow min-w-0">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <h1 className="text-3xl font-bold">{profile.name}</h1>
                     {isOwnProfile && (
                       <Link
                         to="/edit-profile"
-                        className="p-2 rounded-xl glass hover:bg-purple-500/20 transition-colors"
+                        className="p-2 rounded-xl glass hover:bg-emerald-500/20 transition-colors"
                       >
-                        <Edit3 className="w-4 h-4 text-purple-300" />
+                        <Edit3 className="w-4 h-4 text-emerald-300" />
                       </Link>
                     )}
                   </div>
                   <p className="text-white/50 mb-3">{profile.email}</p>
-                  
+
                   {profile.bio && (
                     <p className="text-white/70 text-sm max-w-lg mb-4">{profile.bio}</p>
+                  )}
+
+                  {/* Follow Button */}
+                  {!isOwnProfile && currentUser && (
+                    <button
+                      onClick={handleFollow}
+                      disabled={followLoading}
+                      className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all mb-4 ${
+                        profile.isFollowing
+                          ? 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10'
+                          : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30'
+                      } disabled:opacity-50`}
+                    >
+                      {profile.isFollowing ? (
+                        <>
+                          <UserCheck className="w-4 h-4" />
+                          Following
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          Follow
+                        </>
+                      )}
+                    </button>
                   )}
 
                   {/* Social Links */}
@@ -214,25 +234,29 @@ const UserProfile = () => {
                   <div className="flex flex-wrap gap-4 text-sm text-white/40">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      Joined recently
+                      Joined {formatDate(profile.createdAt)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10">
+              {/* TikTok-Style Stats */}
+              <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
                 <div className="text-center">
-                  <div className="text-2xl font-bold gradient-text">{profile.postCount || 0}</div>
-                  <div className="text-xs text-white/50">Posts</div>
+                  <div className="text-2xl font-bold gradient-text">{profile.followingCount || 0}</div>
+                  <div className="text-xs text-white/50">Following</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
+                  <div className="text-xs text-white/50">Followers</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold gradient-text">{profile.likeCount || 0}</div>
                   <div className="text-xs text-white/50">Likes</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold gradient-text">{profile.commentCount || 0}</div>
-                  <div className="text-xs text-white/50">Comments</div>
+                  <div className="text-2xl font-bold gradient-text">{profile.postCount || 0}</div>
+                  <div className="text-xs text-white/50">Posts</div>
                 </div>
               </div>
             </div>
@@ -258,13 +282,13 @@ const UserProfile = () => {
               {posts.map((post, index) => (
                 <GlassCard key={post.id} delay={index * 0.1}>
                   <Link to={`/post/${post.id}`}>
-                    <h3 className="text-lg font-semibold mb-2 hover:text-purple-300 transition-colors">
+                    <h3 className="text-lg font-semibold mb-2 hover:text-emerald-300 transition-colors">
                       {post.title}
                     </h3>
                   </Link>
                   <p className="text-white/50 text-sm mb-3 line-clamp-2">{post.content}</p>
                   <div className="flex items-center justify-between">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       {post.tags?.slice(0, 2).map((tag) => (
                         <span key={tag} className="tag text-xs flex items-center gap-1">
                           <Tag className="w-3 h-3" />
