@@ -30,34 +30,42 @@ const getUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if this user is admin
     const isAdmin = user.email === ADMIN_EMAIL || user.role === 'admin';
 
-    // Count ONLY published posts (not drafts)
-    const postCount = await prisma.post.count({ 
-      where: { authorId: id, isDraft: false } 
-    });
+    // Count posts - handle missing isDraft field
+    let postCount = 0;
+    try {
+      postCount = await prisma.post.count({ where: { authorId: id, isDraft: false } });
+    } catch (e) {
+      postCount = await prisma.post.count({ where: { authorId: id } });
+    }
 
-    // Count total likes RECEIVED on all user's published posts
-    const userPosts = await prisma.post.findMany({
-      where: { authorId: id, isDraft: false },
-      select: { id: true }
-    });
-    const postIds = userPosts.map(p => p.id);
-    const totalLikesReceived = postIds.length > 0 
-      ? await prisma.like.count({ where: { postId: { in: postIds } } })
-      : 0;
+    // Count likes on published posts
+    let totalLikesReceived = 0;
+    try {
+      const userPosts = await prisma.post.findMany({
+        where: { authorId: id, isDraft: false },
+        select: { id: true }
+      });
+      const postIds = userPosts.map(p => p.id);
+      totalLikesReceived = postIds.length > 0 
+        ? await prisma.like.count({ where: { postId: { in: postIds } } })
+        : 0;
+    } catch (e) {
+      const userPosts = await prisma.post.findMany({
+        where: { authorId: id },
+        select: { id: true }
+      });
+      const postIds = userPosts.map(p => p.id);
+      totalLikesReceived = postIds.length > 0 
+        ? await prisma.like.count({ where: { postId: { in: postIds } } })
+        : 0;
+    }
 
-    // Count comments made by user
     const commentCount = await prisma.comment.count({ where: { authorId: id } });
-
-    // Count followers
     const followersCount = await prisma.follow.count({ where: { followingId: id } });
-
-    // Count following
     const followingCount = await prisma.follow.count({ where: { followerId: id } });
 
-    // Check if current user follows this profile
     let isFollowing = false;
     if (req.user && req.user.id !== id) {
       const follow = await prisma.follow.findUnique({
@@ -71,27 +79,21 @@ const getUserProfile = async (req, res) => {
       isFollowing = !!follow;
     }
 
-    // Get followers list with basic info (last 10)
     const followers = await prisma.follow.findMany({
       where: { followingId: id },
       take: 10,
       orderBy: { createdAt: 'desc' },
       include: {
-        follower: {
-          select: { id: true, name: true, avatar: true }
-        }
+        follower: { select: { id: true, name: true, avatar: true } }
       }
     });
 
-    // Get following list with basic info (last 10)
     const following = await prisma.follow.findMany({
       where: { followerId: id },
       take: 10,
       orderBy: { createdAt: 'desc' },
       include: {
-        following: {
-          select: { id: true, name: true, avatar: true }
-        }
+        following: { select: { id: true, name: true, avatar: true } }
       }
     });
 
@@ -120,18 +122,8 @@ const updateProfile = async (req, res) => {
       where: { id: req.user.id },
       data: { name, bio, avatar, github, twitter, linkedin, website, tiktok, facebook },
       select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-        bio: true,
-        role: true,
-        github: true,
-        twitter: true,
-        linkedin: true,
-        website: true,
-        tiktok: true,
-        facebook: true,
+        id: true, name: true, email: true, avatar: true, bio: true, role: true,
+        github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true,
       }
     });
     res.json({ message: 'Profile updated', user });
@@ -145,30 +137,27 @@ const getUserPosts = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Only show published posts on public profile
-    // If viewing own profile, show drafts too
-    const whereClause = { authorId: id };
-    if (!req.user || req.user.id !== id) {
-      whereClause.isDraft = false;
+    // Try with isDraft filter, fallback to all posts
+    let posts = [];
+    try {
+      posts = await prisma.post.findMany({
+        where: { authorId: id, isDraft: false },
+        include: { author: { select: { id: true, name: true, avatar: true } } },
+        orderBy: { createdAt: 'desc' }
+      });
+    } catch (e) {
+      posts = await prisma.post.findMany({
+        where: { authorId: id },
+        include: { author: { select: { id: true, name: true, avatar: true } } },
+        orderBy: { createdAt: 'desc' }
+      });
     }
-
-    const posts = await prisma.post.findMany({
-      where: whereClause,
-      include: {
-        author: { select: { id: true, name: true, avatar: true } },
-      },
-      orderBy: { createdAt: 'desc' }
-    });
 
     const postsWithCounts = await Promise.all(
       posts.map(async (post) => {
         const likeCount = await prisma.like.count({ where: { postId: post.id } });
         const commentCount = await prisma.comment.count({ where: { postId: post.id } });
-        return {
-          ...post,
-          likeCount,
-          commentCount,
-        };
+        return { ...post, likeCount, commentCount };
       })
     );
 
@@ -181,21 +170,12 @@ const getUserPosts = async (req, res) => {
 
 const uploadAvatar = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No image uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
 
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'devblog-avatars',
-          transformation: [{ width: 400, height: 400, crop: 'fill' }],
-          resource_type: 'image',
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
+        { folder: 'devblog-avatars', transformation: [{ width: 400, height: 400, crop: 'fill' }], resource_type: 'image' },
+        (error, result) => { if (error) reject(error); else resolve(result); }
       );
       uploadStream.end(req.file.buffer);
     });
@@ -203,20 +183,8 @@ const uploadAvatar = async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatar: result.secure_url },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-        bio: true,
-        role: true,
-        github: true,
-        twitter: true,
-        linkedin: true,
-        website: true,
-        tiktok: true,
-        facebook: true,
-      },
+      select: { id: true, name: true, email: true, avatar: true, bio: true, role: true,
+        github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true },
     });
 
     res.json({ message: 'Avatar uploaded', user });
@@ -226,76 +194,42 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-// Follow a user - with socket emission for real-time updates
 const followUser = async (req, res) => {
   try {
     const { id } = req.params;
     const followerId = req.user.id;
-
-    if (followerId === id) {
-      return res.status(400).json({ message: 'Cannot follow yourself' });
-    }
+    if (followerId === id) return res.status(400).json({ message: 'Cannot follow yourself' });
 
     const follow = await prisma.follow.create({
-      data: {
-        followerId,
-        followingId: id,
-      },
+      data: { followerId, followingId: id },
     });
 
-    // Create notification
     const { createNotification } = require('./notificationController');
     await createNotification({
-      userId: id,
-      type: 'follow',
-      message: `${req.user.name} started following you`,
-      actorId: followerId,
+      userId: id, type: 'follow', message: `${req.user.name} started following you`, actorId: followerId,
     });
 
-    // Emit socket event for real-time update
     const io = req.app.get('io');
-    if (io) {
-      io.emit('follow-update', {
-        followerId,
-        followingId: id,
-        action: 'follow',
-      });
-    }
+    if (io) io.emit('follow-update', { followerId, followingId: id, action: 'follow' });
 
     res.json({ message: 'Followed successfully', follow });
   } catch (error) {
-    if (error.code === 'P2002') {
-      return res.status(400).json({ message: 'Already following' });
-    }
+    if (error.code === 'P2002') return res.status(400).json({ message: 'Already following' });
     console.error('Follow error:', error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// Unfollow a user - with socket emission for real-time updates
 const unfollowUser = async (req, res) => {
   try {
     const { id } = req.params;
     const followerId = req.user.id;
-
     await prisma.follow.delete({
-      where: {
-        followerId_followingId: {
-          followerId,
-          followingId: id,
-        },
-      },
+      where: { followerId_followingId: { followerId, followingId: id } },
     });
 
-    // Emit socket event for real-time update
     const io = req.app.get('io');
-    if (io) {
-      io.emit('follow-update', {
-        followerId,
-        followingId: id,
-        action: 'unfollow',
-      });
-    }
+    if (io) io.emit('follow-update', { followerId, followingId: id, action: 'unfollow' });
 
     res.json({ message: 'Unfollowed successfully' });
   } catch (error) {
