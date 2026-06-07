@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
@@ -13,6 +13,7 @@ const UserProfile = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showModal, setShowModal] = useState(null); // 'followers' or 'following' or null
 
   const isOwnProfile = currentUser && currentUser.id === id;
 
@@ -23,15 +24,9 @@ const UserProfile = () => {
   const fetchProfileData = async () => {
     try {
       setLoading(true);
-
-      // Fetch profile - always send auth token so isFollowing works
       const userRes = await api.get(`/users/${id}`);
-      const userData = userRes.data;
-
-      // Fetch user's posts
       const postsRes = await api.get(`/users/${id}/posts`);
-
-      setProfile(userData);
+      setProfile(userRes.data);
       setPosts(postsRes.data || []);
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -176,20 +171,19 @@ const UserProfile = () => {
                       </Link>
                     )}
                   </div>
-                  <p className="text-white/50 mb-3">{profile.email}</p>
 
                   {profile.bio && (
                     <p className="text-white/70 text-sm max-w-lg mb-4">{profile.bio}</p>
                   )}
 
-                  {/* Follow Button - ONLY show if not own profile and logged in */}
+                  {/* Follow Button - Toggle Follow/Unfollow */}
                   {!isOwnProfile && currentUser && (
                     <button
                       onClick={handleFollow}
                       disabled={followLoading}
                       className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all mb-4 ${
                         profile.isFollowing
-                          ? 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10'
+                          ? 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-red-400 hover:border-red-400/30'
                           : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30'
                       } disabled:opacity-50`}
                     >
@@ -240,16 +234,22 @@ const UserProfile = () => {
                 </div>
               </div>
 
-              {/* TikTok-Style Stats */}
+              {/* TikTok-Style Stats - Clickable to open modal */}
               <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
-                <div className="text-center">
+                <button 
+                  onClick={() => setShowModal('following')}
+                  className="text-center hover:bg-white/5 rounded-xl py-2 transition-colors"
+                >
                   <div className="text-2xl font-bold gradient-text">{profile.followingCount || 0}</div>
                   <div className="text-xs text-white/50">Following</div>
-                </div>
-                <div className="text-center">
+                </button>
+                <button 
+                  onClick={() => setShowModal('followers')}
+                  className="text-center hover:bg-white/5 rounded-xl py-2 transition-colors"
+                >
                   <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
                   <div className="text-xs text-white/50">Followers</div>
-                </div>
+                </button>
                 <div className="text-center">
                   <div className="text-2xl font-bold gradient-text">{profile.likeCount || 0}</div>
                   <div className="text-xs text-white/50">Likes</div>
@@ -259,68 +259,6 @@ const UserProfile = () => {
                   <div className="text-xs text-white/50">Posts</div>
                 </div>
               </div>
-
-              {/* Followers List - shows who follows this profile */}
-              {profile.followersList && profile.followersList.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-white/10">
-                  <h3 className="text-sm font-medium text-white/60 mb-3">
-                    Followers ({profile.followersCount})
-                  </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {profile.followersList.map((follower) => (
-                      <Link
-                        key={follower.id}
-                        to={`/user/${follower.id}`}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl glass hover:bg-white/5 transition-all"
-                      >
-                        {follower.avatar ? (
-                          <img
-                            src={follower.avatar}
-                            alt={follower.name}
-                            className="w-6 h-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
-                            {follower.name && follower.name[0] ? follower.name[0] : 'U'}
-                          </div>
-                        )}
-                        <span className="text-sm text-white/70">{follower.name}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Following List - shows who this profile follows */}
-              {profile.followingList && profile.followingList.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-white/10">
-                  <h3 className="text-sm font-medium text-white/60 mb-3">
-                    Following ({profile.followingCount})
-                  </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {profile.followingList.map((following) => (
-                      <Link
-                        key={following.id}
-                        to={`/user/${following.id}`}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl glass hover:bg-white/5 transition-all"
-                      >
-                        {following.avatar ? (
-                          <img
-                            src={following.avatar}
-                            alt={following.name}
-                            className="w-6 h-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
-                            {following.name && following.name[0] ? following.name[0] : 'U'}
-                          </div>
-                        )}
-                        <span className="text-sm text-white/70">{following.name}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </GlassCard>
 
@@ -375,6 +313,96 @@ const UserProfile = () => {
           )}
         </motion.div>
       </div>
+
+      {/* Modal for Followers/Following List */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass w-full max-w-md max-h-[70vh] rounded-2xl overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <h3 className="text-lg font-semibold">
+                  {showModal === 'followers' ? 'Followers' : 'Following'}
+                  <span className="text-white/40 text-sm ml-2">
+                    ({showModal === 'followers' ? (profile.followersCount || 0) : (profile.followingCount || 0)})
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setShowModal(null)}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5 text-white/60" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="overflow-y-auto p-4 space-y-3">
+                {showModal === 'followers' && profile.followersList && profile.followersList.length > 0 ? (
+                  profile.followersList.map((follower) => (
+                    <Link
+                      key={follower.id}
+                      to={`/user/${follower.id}`}
+                      onClick={() => setShowModal(null)}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+                    >
+                      {follower.avatar ? (
+                        <img
+                          src={follower.avatar}
+                          alt={follower.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                          {follower.name && follower.name[0] ? follower.name[0] : 'U'}
+                        </div>
+                      )}
+                      <span className="text-white/80 font-medium">{follower.name}</span>
+                    </Link>
+                  ))
+                ) : showModal === 'following' && profile.followingList && profile.followingList.length > 0 ? (
+                  profile.followingList.map((following) => (
+                    <Link
+                      key={following.id}
+                      to={`/user/${following.id}`}
+                      onClick={() => setShowModal(null)}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+                    >
+                      {following.avatar ? (
+                        <img
+                          src={following.avatar}
+                          alt={following.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                          {following.name && following.name[0] ? following.name[0] : 'U'}
+                        </div>
+                      )}
+                      <span className="text-white/80 font-medium">{following.name}</span>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-center text-white/40 py-8">
+                    No {showModal} yet
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
