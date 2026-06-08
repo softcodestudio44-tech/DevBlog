@@ -205,6 +205,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
         />
       )}
 
+      {/* SIDEBAR - Only show relevant section based on defaultTab */}
       <div className={`
         fixed lg:static z-50 h-full w-80 lg:w-72 bg-[#0d1210]/95 backdrop-blur-xl 
         border-r border-lime-500/10 flex flex-col flex-shrink-0
@@ -230,120 +231,45 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </button>
         </div>
 
-        <div className="flex border-b border-lime-500/10">
-          <button
-            onClick={() => setActiveTab('channels')}
-            className={`flex-1 py-3 text-xs font-medium transition-all ${
-              activeTab === 'channels' 
-                ? 'text-lime-400 border-b-2 border-lime-500/30' 
-                : 'text-white/30 hover:text-white/50'
-            }`}
-          >
-            Channels
-          </button>
-          <button
-            onClick={() => setActiveTab('dms')}
-            className={`flex-1 py-3 text-xs font-medium transition-all ${
-              activeTab === 'dms' 
-                ? 'text-lime-400 border-b-2 border-lime-500/30' 
-                : 'text-white/30 hover:text-white/50'
-            }`}
-          >
-            Messages
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {activeTab === 'channels' ? (
-            <div className="p-3 space-y-1">
-              <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Channels</p>
-              {rooms.map((room) => (
-                <button
-                  key={room.id}
-                  onClick={() => selectRoom(room)}
-                  className={`w-full text-left p-3 rounded-xl transition-all ${
-                    activeRoom?.id === room.id && !dmUser
-                      ? 'bg-lime-500/10 border border-lime-500/20'
-                      : 'hover:bg-white/[0.02] border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      activeRoom?.id === room.id && !dmUser ? 'bg-lime-500/15 text-lime-400' : 'bg-white/5 text-white/20'
-                    }`}>
-                      <Hash className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className={`text-sm font-medium block truncate ${activeRoom?.id === room.id && !dmUser ? 'text-lime-300' : 'text-white/60'}`}>
-                        {room.name}
-                      </span>
-                      {room.topic && <span className="text-[11px] text-white/20 truncate block">{room.topic}</span>}
-                    </div>
+        {/* Only show tabs if NOT locked to a specific tab */}
+        {defaultTab === 'channels' && (
+          <div className="p-3 space-y-1">
+            <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Channels</p>
+            {rooms.map((room) => (
+              <button
+                key={room.id}
+                onClick={() => selectRoom(room)}
+                className={`w-full text-left p-3 rounded-xl transition-all ${
+                  activeRoom?.id === room.id && !dmUser
+                    ? 'bg-lime-500/10 border border-lime-500/20'
+                    : 'hover:bg-white/[0.02] border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    activeRoom?.id === room.id && !dmUser ? 'bg-lime-500/15 text-lime-400' : 'bg-white/5 text-white/20'
+                  }`}>
+                    <Hash className="w-4 h-4" />
                   </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="p-3 space-y-1">
-              <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Conversations</p>
+                  <div className="min-w-0">
+                    <span className={`text-sm font-medium block truncate ${activeRoom?.id === room.id && !dmUser ? 'text-lime-300' : 'text-white/60'}`}>
+                      {room.name}
+                    </span>
+                    {room.topic && <span className="text-[11px] text-white/20 truncate block">{room.topic}</span>}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
-              {dmHistory.map((u) => {
-                const online = isUserOnline(u.id);
-                return (
-                  <button
-                    key={u.id}
-                    onClick={() => startDM(u)}
-                    className={`w-full text-left p-3 rounded-xl transition-all ${
-                      dmUser?.id === u.id
-                        ? 'bg-lime-500/10 border border-lime-500/20'
-                        : 'hover:bg-white/[0.02] border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-shrink-0">
-                        <Link to={`/user/${u.id}`} onClick={(e) => e.stopPropagation()}>
-                          {u.avatar ? (
-                            <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-lime-500/15 hover:ring-lime-400 transition-all" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-lime-600 hover:to-teal-700 transition-all">
-                              {u.name?.[0]}
-                            </div>
-                          )}
-                        </Link>
-                        {online ? (
-                          <Circle className="w-2 h-2 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
-                        ) : (
-                          <Circle className="w-2 h-2 text-white/20 absolute -bottom-0.5 -right-0.5 fill-white/20 stroke-[3]" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <Link 
-                            to={`/user/${u.id}`} 
-                            onClick={(e) => e.stopPropagation()}
-                            className={`text-sm font-medium block truncate hover:text-lime-300 transition-colors ${dmUser?.id === u.id ? 'text-lime-300' : 'text-white/60'}`}
-                          >
-                            {u.name}
-                          </Link>
-                        </div>
-                        <span className={`text-[11px] truncate block ${online ? 'text-lime-400/50' : 'text-white/20'}`}>
-                          {online ? 'Online' : u.lastMessage ? u.lastMessage.substring(0, 20) + (u.lastMessage.length > 20 ? '...' : '') : 'Offline'}
-                        </span>
-                      </div>
-                      <Link 
-                        to={`/user/${u.id}`} 
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-lime-400 transition-all flex-shrink-0"
-                        title="View profile"
-                      >
-                        <Users className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  </button>
-                );
-              })}
+        {defaultTab === 'dms' && (
+          <div className="p-3 space-y-1">
+            <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Conversations</p>
 
-              {onlineUsers.filter(u => u.id !== user?.id && !dmHistory.find(d => d.id === u.id)).map((u) => (
+            {dmHistory.map((u) => {
+              const online = isUserOnline(u.id);
+              return (
                 <button
                   key={u.id}
                   onClick={() => startDM(u)}
@@ -364,17 +290,25 @@ const Chat = ({ defaultTab = 'channels' }) => {
                           </div>
                         )}
                       </Link>
-                      <Circle className="w-2 h-2 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
+                      {online ? (
+                        <Circle className="w-2 h-2 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
+                      ) : (
+                        <Circle className="w-2 h-2 text-white/20 absolute -bottom-0.5 -right-0.5 fill-white/20 stroke-[3]" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <Link 
-                        to={`/user/${u.id}`} 
-                        onClick={(e) => e.stopPropagation()}
-                        className={`text-sm font-medium block truncate hover:text-lime-300 transition-colors ${dmUser?.id === u.id ? 'text-lime-300' : 'text-white/60'}`}
-                      >
-                        {u.name}
-                      </Link>
-                      <span className="text-[11px] text-lime-400/50 truncate block">Online</span>
+                      <div className="flex items-center justify-between">
+                        <Link 
+                          to={`/user/${u.id}`} 
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-sm font-medium block truncate hover:text-lime-300 transition-colors ${dmUser?.id === u.id ? 'text-lime-300' : 'text-white/60'}`}
+                        >
+                          {u.name}
+                        </Link>
+                      </div>
+                      <span className={`text-[11px] truncate block ${online ? 'text-lime-400/50' : 'text-white/20'}`}>
+                        {online ? 'Online' : u.lastMessage ? u.lastMessage.substring(0, 20) + (u.lastMessage.length > 20 ? '...' : '') : 'Offline'}
+                      </span>
                     </div>
                     <Link 
                       to={`/user/${u.id}`} 
@@ -386,14 +320,59 @@ const Chat = ({ defaultTab = 'channels' }) => {
                     </Link>
                   </div>
                 </button>
-              ))}
+              );
+            })}
 
-              {dmHistory.length === 0 && onlineUsers.filter(u => u.id !== user?.id).length === 0 && (
-                <p className="text-xs text-white/20 text-center py-8">No conversations yet. Start messaging someone!</p>
-              )}
-            </div>
-          )}
-        </div>
+            {onlineUsers.filter(u => u.id !== user?.id && !dmHistory.find(d => d.id === u.id)).map((u) => (
+              <button
+                key={u.id}
+                onClick={() => startDM(u)}
+                className={`w-full text-left p-3 rounded-xl transition-all ${
+                  dmUser?.id === u.id
+                    ? 'bg-lime-500/10 border border-lime-500/20'
+                    : 'hover:bg-white/[0.02] border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-shrink-0">
+                    <Link to={`/user/${u.id}`} onClick={(e) => e.stopPropagation()}>
+                      {u.avatar ? (
+                        <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-lime-500/15 hover:ring-lime-400 transition-all" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-lime-600 hover:to-teal-700 transition-all">
+                          {u.name?.[0]}
+                        </div>
+                      )}
+                    </Link>
+                    <Circle className="w-2 h-2 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Link 
+                      to={`/user/${u.id}`} 
+                      onClick={(e) => e.stopPropagation()}
+                      className={`text-sm font-medium block truncate hover:text-lime-300 transition-colors ${dmUser?.id === u.id ? 'text-lime-300' : 'text-white/60'}`}
+                    >
+                      {u.name}
+                    </Link>
+                    <span className="text-[11px] text-lime-400/50 truncate block">Online</span>
+                  </div>
+                  <Link 
+                    to={`/user/${u.id}`} 
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-lime-400 transition-all flex-shrink-0"
+                    title="View profile"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </button>
+            ))}
+
+            {dmHistory.length === 0 && onlineUsers.filter(u => u.id !== user?.id).length === 0 && (
+              <p className="text-xs text-white/20 text-center py-8">No conversations yet. Start messaging someone!</p>
+            )}
+          </div>
+        )}
 
         <div className="p-4 border-t border-lime-500/10 flex-shrink-0">
           <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider mb-3">Online Now</p>
