@@ -223,21 +223,23 @@ const Home = () => {
               <GlassCard key={post.id} delay={index * 0.1}>
                 <Link to={`/post/${post.id}`} className="flex flex-col h-full cursor-pointer">
                   <div className="flex items-center gap-2 mb-4">
-                    <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                      {post.author?.avatar ? (
-                        <img 
-                          src={post.author.avatar} 
-                          alt={post.author.name} 
-                          className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
-                          {post.author?.name?.[0] || 'U'}
-                        </div>
-                      )}
-                    </Link>
-                    <div>
-                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white/80 hover:text-emerald-300 transition-colors" onClick={(e) => e.stopPropagation()}>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
+                        {post.author?.avatar ? (
+                          <img 
+                            src={post.author.avatar} 
+                            alt={post.author.name} 
+                            className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+                            {post.author?.name?.[0] || 'U'}
+                          </div>
+                        )}
+                      </Link>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white/80 hover:text-emerald-300 transition-colors">
                         {post.author?.name || 'Unknown'}
                       </Link>
                       <div className="flex items-center gap-1 text-xs text-white/40">
@@ -250,16 +252,16 @@ const Home = () => {
                   <h3 className="text-xl font-semibold mb-3 text-white line-clamp-2">{post.title}</h3>
                   <p className="text-white/50 text-sm mb-4 line-clamp-3 flex-grow">{post.content}</p>
 
-                  {/* Post Images Preview */}
+                  {/* Post Images Preview - object-contain to show full image */}
                   {post.images && post.images.length > 0 && (
-                    <div className="mb-4">
+                    <div className="mb-4 rounded-lg overflow-hidden bg-white/5">
                       <img 
                         src={post.images[0]} 
                         alt={post.title}
-                        className="w-full h-40 object-cover rounded-lg"
+                        className="w-full h-48 object-contain"
                       />
                       {post.images.length > 1 && (
-                        <p className="text-xs text-white/30 mt-1">+{post.images.length - 1} more</p>
+                        <p className="text-xs text-white/30 mt-1 text-center">+{post.images.length - 1} more</p>
                       )}
                     </div>
                   )}

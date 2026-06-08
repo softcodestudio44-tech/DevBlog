@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowLeft, Heart, MessageCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Tag, Heart, MessageCircle, Share2, Trash2, Edit3 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import CommentSection from '../components/CommentSection';
+import MarkdownRenderer from '../components/MarkdownRenderer';
+import SEO from '../components/SEO';
 
 const PostDetail = () => {
   const { id } = useParams();
@@ -14,6 +16,12 @@ const PostDetail = () => {
   const { user } = useAuth();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  // Scroll to top when page loads
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
 
   useEffect(() => {
     fetchPost();
@@ -21,6 +29,7 @@ const PostDetail = () => {
 
   const fetchPost = async () => {
     try {
+      setLoading(true);
       const response = await api.get(`/posts/${id}`);
       setPost(response.data);
     } catch (error) {
@@ -31,14 +40,16 @@ const PostDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
-
+    if (!window.confirm('Delete this post?')) return;
+    setDeleting(true);
     try {
       await api.delete(`/posts/${id}`);
       navigate('/');
     } catch (error) {
       console.error('Delete error:', error);
       alert('Failed to delete post');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -49,11 +60,6 @@ const PostDetail = () => {
       year: 'numeric',
     });
   };
-
-  // Check if user is author OR admin (by role or email)
-  const isAuthor = user?.id === post?.authorId;
-  const isAdmin = user?.role === 'admin' || user?.email === 'softcodestudio44@gmail.com';
-  const canDelete = isAuthor || isAdmin;
 
   if (loading) {
     return (
@@ -71,115 +77,141 @@ const PostDetail = () => {
         <GlassCard className="text-center py-12">
           <p className="text-white/60 text-lg">Post not found</p>
           <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
-            Go back home
+            Back to posts
           </Link>
         </GlassCard>
       </div>
     );
   }
 
+  const isAuthor = user && user.id === post.authorId;
+  const isAdmin = user && (user.role === 'admin' || user.email === 'softcodestudio44@gmail.com');
+  const canDelete = isAuthor || isAdmin;
+
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <>
+      <SEO title={post.title} description={post.content?.slice(0, 160)} />
+      <div className="min-h-screen pt-24 pb-12 px-4">
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors"
+              className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to posts
             </Link>
 
-            {canDelete && (
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all text-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            )}
-          </div>
+            <GlassCard className="mb-8">
+              {/* Author info */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <Link to={`/user/${post.authorId}`}>
+                    {post.author?.avatar ? (
+                      <img
+                        src={post.author.avatar}
+                        alt={post.author.name}
+                        className="w-10 h-10 rounded-full object-cover border border-emerald-500/30"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                        {post.author?.name?.[0] || 'U'}
+                      </div>
+                    )}
+                  </Link>
+                  <div>
+                    <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-emerald-300 transition-colors">
+                      {post.author?.name || 'Unknown'}
+                    </Link>
+                    <div className="flex items-center gap-1 text-xs text-white/40">
+                      <Clock className="w-3 h-3" />
+                      {formatDate(post.createdAt)}
+                    </div>
+                  </div>
+                </div>
 
-          <GlassCard>
-            <div className="flex items-center gap-3 mb-6">
-              {post.author?.avatar ? (
-                <img 
-                  src={post.author.avatar} 
-                  alt={post.author.name} 
-                  className="w-12 h-12 rounded-full object-cover border border-emerald-500/30" 
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-lg font-bold text-white">
-                  {post.author?.name?.[0] || 'U'}
+                <div className="flex items-center gap-2">
+                  {canDelete && (
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="p-2 rounded-xl hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-colors"
+                      title="Delete post"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  {isAuthor && (
+                    <Link
+                      to={`/edit-post/${id}`}
+                      className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-emerald-300 transition-colors"
+                      title="Edit post"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {/* Title */}
+              <h1 className="text-3xl font-bold mb-4 text-white">{post.title}</h1>
+
+              {/* Tags */}
+              {post.tags && post.tags.length > 0 && (
+                <div className="flex gap-2 flex-wrap mb-6">
+                  {post.tags.map((tag) => (
+                    <span key={tag} className="tag flex items-center gap-1">
+                      <Tag className="w-3 h-3" />
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               )}
-              <div>
-                <Link to={`/user/${post.authorId}`} className="font-medium hover:text-emerald-300 transition-colors">
-                  {post.author?.name || 'Unknown'}
-                </Link>
-                <div className="flex items-center gap-1 text-sm text-white/40">
-                  <Clock className="w-3 h-3" />
-                  {formatDate(post.createdAt)}
+
+              {/* Images - Full display without cropping */}
+              {post.images && post.images.length > 0 && (
+                <div className="space-y-4 mb-6">
+                  {post.images.map((img, i) => (
+                    <div key={i} className="rounded-xl overflow-hidden bg-white/5">
+                      <img
+                        src={img}
+                        alt={`Post image ${i + 1}`}
+                        className="w-full h-auto max-h-[500px] object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                  ))}
                 </div>
+              )}
+
+              {/* Content - Render markdown properly */}
+              <div className="prose prose-invert max-w-none mb-8">
+                <MarkdownRenderer content={post.content} />
               </div>
-            </div>
 
-            <h1 className="text-3xl font-bold mb-6">{post.title}</h1>
-
-            {/* Post Images */}
-            {post.images && post.images.length > 0 && (
-              <div className="mb-6 space-y-3">
-                {post.images.map((img, i) => (
-                  <img 
-                    key={i} 
-                    src={img} 
-                    alt={`Post image ${i + 1}`} 
-                    className="w-full rounded-xl object-cover max-h-[500px]" 
-                  />
-                ))}
-              </div>
-            )}
-
-            <div className="prose prose-invert max-w-none mb-6">
-              <p className="text-white/70 leading-relaxed whitespace-pre-wrap">
-                {post.content}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between pt-6 border-t border-white/10 flex-wrap gap-3">
-              <div className="flex gap-2 flex-wrap">
-                {post.tags?.map((tag) => (
-                  <span key={tag} className="tag flex items-center gap-1">
-                    <Tag className="w-3 h-3" />
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center gap-4">
+              {/* Actions */}
+              <div className="flex items-center gap-4 pt-6 border-t border-white/10">
                 <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
-                <div className="flex items-center gap-2 text-white/50">
-                  <MessageCircle className="w-4 h-4" />
+                <button className="flex items-center gap-2 text-white/40 hover:text-emerald-300 transition-colors">
+                  <MessageCircle className="w-5 h-5" />
                   <span className="text-sm">{post.commentCount || 0}</span>
-                </div>
+                </button>
+                <button className="flex items-center gap-2 text-white/40 hover:text-emerald-300 transition-colors ml-auto">
+                  <Share2 className="w-5 h-5" />
+                  <span className="text-sm">Share</span>
+                </button>
               </div>
-            </div>
-          </GlassCard>
-
-          {/* Comments */}
-          <div className="mt-6">
-            <GlassCard>
-              <CommentSection postId={post.id} />
             </GlassCard>
-          </div>
-        </motion.div>
+
+            {/* Comments */}
+            <CommentSection postId={post.id} postAuthorId={post.authorId} />
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
