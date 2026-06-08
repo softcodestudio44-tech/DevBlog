@@ -32,7 +32,6 @@ function AppContent() {
 
         <main className="flex-1 flex flex-col min-w-0 pt-16">
           <Routes>
-            {/* Main routes */}
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -43,11 +42,11 @@ function AppContent() {
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route path="/betty-ai" element={<BettyAI />} />
 
-            {/* NEW: Separate Community & Messages pages */}
+            {/* NEW: Separate Community (channels) and Messages (DMs) */}
             <Route path="/community" element={<Chat defaultTab="channels" />} />
             <Route path="/messages" element={<Chat defaultTab="dms" />} />
 
-            {/* Optional: keep old routes to avoid broken links */}
+            {/* Keep old routes in case of bookmarks */}
             <Route path="/chat" element={<Chat defaultTab="channels" />} />
             <Route path="/dm" element={<Chat defaultTab="dms" />} />
           </Routes>
