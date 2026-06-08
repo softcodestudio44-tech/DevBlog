@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageCircle, Send, Users, Hash, Circle, Menu, X, ArrowLeft, 
-  Trash2, Paperclip, Mic, CheckCheck, Clock
+  Trash2, Paperclip, Mic, CheckCheck
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -12,66 +12,107 @@ import { useSocket } from '../context/SocketContext';
 const Chat = ({ defaultTab = 'channels' }) => {
   const { user, isAuthenticated } = useAuth();
   const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping } = useSocket();
+  
+  // Channel state
   const [rooms, setRooms] = useState([]);
   const [activeRoom, setActiveRoom] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [channelMessages, setChannelMessages] = useState([]);
+  
+  // DM state
+  const [dmHistory, setDmHistory] = useState([]);
+  const [activeDMUser, setActiveDMUser] = useState(null);
+  const [dmMessages, setDmMessages] = useState([]);
+  
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [dmUser, setDmUser] = useState(null);
-  const [dmHistory, setDmHistory] = useState([]);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
+  const isChannelTab = defaultTab === 'channels';
 
-  // ----- Data fetching -----
+  // ---- Fetch initial data ----
   useEffect(() => {
-    fetchRooms();
-    fetchDMHistory();
+    const init = async () => {
+      await Promise.all([fetchRooms(), fetchDMHistory()]);
+      setLoading(false);
+    };
+    init();
   }, []);
 
+  // ---- Socket listeners ----
   useEffect(() => {
-    if (socket) {
-      const handleNewMessage = (message) => {
-        setMessages(prev => {
-          if (prev.find(m => m.id === message.id)) return prev;
+    if (!socket) return;
+
+    // New channel message
+    const handleNewChannelMessage = (message) => {
+      if (activeRoom && message.roomId === activeRoom.id) {
+        setChannelMessages(prev => {
+          if (prev.some(m => m.id === message.id)) return prev;
           return [...prev, message];
         });
-      };
-      const handleNewDM = (message) => {
-        fetchDMHistory();
-        if (dmUser && (message.authorId === dmUser.id || message.authorId === user?.id)) {
-          setMessages(prev => {
-            if (prev.find(m => m.id === message.id)) return prev;
-            return [...prev, message];
-          });
-        }
-      };
-      const handleMessagesCleared = () => setMessages([]);
-      socket.on('new-message', handleNewMessage);
-      socket.on('new-dm', handleNewDM);
-      socket.on('messages-cleared', handleMessagesCleared);
-      return () => {
-        socket.off('new-message', handleNewMessage);
-        socket.off('new-dm', handleNewDM);
-        socket.off('messages-cleared', handleMessagesCleared);
-      };
-    }
-  }, [socket, dmUser, user]);
+      }
+    };
 
+    // New DM message
+    const handleNewDM = (message) => {
+      // Update DM history (add/update conversation)
+      setDmHistory(prev => {
+        const existingIndex = prev.findIndex(u => u.id === message.authorId);
+        const newEntry = {
+          id: message.authorId,
+          name: message.author?.name,
+          avatar: message.author?.avatar,
+          lastMessage: message.content,
+          lastMessageAt: message.createdAt,
+        };
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = newEntry;
+          return updated;
+        }
+        return [newEntry, ...prev];
+      });
+
+      // If this DM is currently open, add message to dmMessages
+      if (activeDMUser && message.authorId === activeDMUser.id) {
+        setDmMessages(prev => {
+          if (prev.some(m => m.id === message.id)) return prev;
+          return [...prev, message];
+        });
+      }
+    };
+
+    socket.on('new-message', handleNewChannelMessage);
+    socket.on('new-dm', handleNewDM);
+    socket.on('messages-cleared', () => {
+      if (activeRoom) setChannelMessages([]);
+    });
+
+    return () => {
+      socket.off('new-message', handleNewChannelMessage);
+      socket.off('new-dm', handleNewDM);
+      socket.off('messages-cleared');
+    };
+  }, [socket, activeRoom, activeDMUser]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [channelMessages, dmMessages]);
 
+  // ---- Data fetching ----
   const fetchRooms = async () => {
     try {
       const res = await api.get('/chat/rooms');
       setRooms(res.data);
-      if (res.data.length > 0 && defaultTab === 'channels') selectRoom(res.data[0]);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+      if (res.data.length > 0 && isChannelTab) {
+        selectRoom(res.data[0]);
+      }
+    } catch (err) { console.error(err); }
   };
 
   const fetchDMHistory = async () => {
@@ -85,34 +126,46 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const selectRoom = async (room) => {
     if (activeRoom) leaveRoom(activeRoom.id);
     setActiveRoom(room);
-    setDmUser(null);
+    setActiveDMUser(null);
     setShowSidebar(false);
     joinRoom(room.id);
     try {
       const res = await api.get(`/chat/rooms/${room.id}/messages`);
-      setMessages(res.data);
+      setChannelMessages(res.data);
     } catch (err) { console.error(err); }
   };
 
   const startDM = async (targetUser) => {
     if (activeRoom) leaveRoom(activeRoom.id);
     setActiveRoom(null);
-    setDmUser(targetUser);
+    setActiveDMUser(targetUser);
     setShowSidebar(false);
     const sorted = [user.id, targetUser.id].sort();
     const roomName = `dm:${sorted[0]}:${sorted[1]}`;
     joinRoom(roomName);
     try {
       const res = await api.get(`/chat/rooms/${roomName}/messages`);
-      setMessages(res.data);
-    } catch (err) { setMessages([]); }
+      setDmMessages(res.data);
+    } catch (err) { setDmMessages([]); }
   };
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
-    if (dmUser) {
-      socket.emit('send-dm', { recipientId: dmUser.id, content: newMessage.trim() });
+    if (activeDMUser) {
+      socket.emit('send-dm', {
+        recipientId: activeDMUser.id,
+        content: newMessage.trim(),
+      });
+      // Optimistically add to dmMessages
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        content: newMessage.trim(),
+        authorId: user.id,
+        author: { id: user.id, name: user.name, avatar: user.avatar },
+        createdAt: new Date().toISOString(),
+      };
+      setDmMessages(prev => [...prev, optimisticMessage]);
     } else if (activeRoom) {
       sendMessage(activeRoom.id, newMessage.trim());
     } else return;
@@ -133,19 +186,18 @@ const Chat = ({ defaultTab = 'channels' }) => {
     if (!window.confirm('Clear all messages in this channel?')) return;
     try {
       await api.delete(`/chat/rooms/${activeRoom.id}/clear`);
-      setMessages([]);
+      setChannelMessages([]);
     } catch (err) { console.error(err); }
   };
 
   const formatTime = (dateStr) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const isUserOnline = (uid) => onlineUsers.some(u => u.id === uid);
   const goBackToChannels = () => {
-    setDmUser(null);
-    setMessages([]);
+    setActiveDMUser(null);
+    setDmMessages([]);
     if (rooms.length) selectRoom(rooms[0]);
   };
 
-  // Typing indicator for active room
   const currentTyping = activeRoom
     ? Object.entries(typingUsers)
         .filter(([id, name]) => name && id !== user?.id)
@@ -160,10 +212,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
     );
   }
 
-  // ----- Different sidebar layouts for Community vs Messages -----
+  // ---- Sidebar render (different for Community vs Messages) ----
   const renderSidebar = () => {
-    if (defaultTab === 'channels') {
-      // Community sidebar: channels list
+    if (isChannelTab) {
+      // Community sidebar: channels only
       return (
         <div className="p-3 space-y-1">
           <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">CHANNELS</p>
@@ -172,14 +224,14 @@ const Chat = ({ defaultTab = 'channels' }) => {
               key={room.id}
               onClick={() => selectRoom(room)}
               className={`w-full text-left p-3 rounded-xl transition-all ${
-                activeRoom?.id === room.id && !dmUser
+                activeRoom?.id === room.id && !activeDMUser
                   ? 'bg-lime-500/10 border border-lime-500/20'
                   : 'hover:bg-white/[0.02] border border-transparent'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                  activeRoom?.id === room.id && !dmUser ? 'bg-lime-500/15 text-lime-400' : 'bg-white/5 text-white/20'
+                  activeRoom?.id === room.id && !activeDMUser ? 'bg-lime-500/15 text-lime-400' : 'bg-white/5 text-white/20'
                 }`}>
                   <Hash className="w-4 h-4" />
                 </div>
@@ -195,7 +247,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
         </div>
       );
     } else {
-      // Messages sidebar: DM conversations
+      // Messages sidebar: DM conversations only
       const allConversations = [...dmHistory];
       const otherOnline = onlineUsers.filter(u => u.id !== user?.id && !dmHistory.find(d => d.id === u.id));
       return (
@@ -208,7 +260,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
                 key={u.id}
                 onClick={() => startDM(u)}
                 className={`w-full text-left p-2 rounded-xl transition-all ${
-                  dmUser?.id === u.id ? 'bg-lime-500/10 border border-lime-500/20' : 'hover:bg-white/[0.02] border border-transparent'
+                  activeDMUser?.id === u.id ? 'bg-lime-500/10 border border-lime-500/20' : 'hover:bg-white/[0.02] border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -273,7 +325,6 @@ const Chat = ({ defaultTab = 'channels' }) => {
     }
   };
 
-  // ----- Global online users widget (for both tabs) -----
   const renderOnlineWidget = () => (
     <div className="p-4 border-t border-white/5 flex-shrink-0">
       <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-3">ONLINE NOW</p>
@@ -303,25 +354,25 @@ const Chat = ({ defaultTab = 'channels' }) => {
     </div>
   );
 
-  // ----- Main chat area -----
+  // ---- Main chat area (messages) ----
+  const currentMessages = activeDMUser ? dmMessages : channelMessages;
   const renderMessages = () => (
     <div
       ref={messagesContainerRef}
       className="flex-1 overflow-y-auto px-4 py-6 space-y-3"
       style={{ scrollBehavior: 'smooth' }}
     >
-      {messages.length === 0 && dmUser && (
+      {currentMessages.length === 0 && activeDMUser && (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <div className="w-16 h-16 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
             <MessageCircle className="w-7 h-7 text-lime-400/30" />
           </div>
-          <p className="text-sm text-white/40">Start a conversation with {dmUser.name}</p>
+          <p className="text-sm text-white/40">Start a conversation with {activeDMUser.name}</p>
         </div>
       )}
-      {messages.map((msg, idx) => {
+      {currentMessages.map((msg, idx) => {
         const isOwn = msg.authorId === user?.id;
-        const showAvatar = idx === 0 || messages[idx-1]?.authorId !== msg.authorId;
-        // Telegram style: own message on right, other on left
+        const showAvatar = idx === 0 || currentMessages[idx-1]?.authorId !== msg.authorId;
         return (
           <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex gap-2 max-w-[80%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -352,9 +403,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
                   </div>
                 )}
                 <div className={`px-4 py-2.5 rounded-2xl ${
-                  isOwn
-                    ? 'message-user text-white/90'
-                    : 'message-other text-white/80'
+                  isOwn ? 'message-user text-white/90' : 'message-other text-white/80'
                 }`}>
                   <p className="text-sm break-words leading-relaxed">{msg.content}</p>
                 </div>
@@ -368,7 +417,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </div>
         );
       })}
-      {currentTyping.length > 0 && (
+      {currentTyping.length > 0 && !activeDMUser && (
         <div className="flex justify-start">
           <div className="flex gap-2 max-w-[80%]">
             <div className="flex-shrink-0 self-end">
@@ -390,7 +439,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
   );
 
   const renderHeader = () => {
-    if (activeRoom && !dmUser) {
+    if (activeRoom && !activeDMUser) {
       return (
         <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0d1210]/80 backdrop-blur-sm">
           <button onClick={() => setShowSidebar(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50">
@@ -400,7 +449,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
             <Hash className="w-4 h-4 text-lime-400" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-white text-sm">{activeRoom.name}</h3>
+            <h3 className="font-semibold text-white text-sm">#{activeRoom.name}</h3>
             <p className="text-xs text-white/30 truncate">{activeRoom.topic}</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -416,7 +465,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </div>
         </div>
       );
-    } else if (dmUser) {
+    } else if (activeDMUser) {
       return (
         <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0d1210]/80 backdrop-blur-sm">
           <button onClick={() => setShowSidebar(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50">
@@ -425,24 +474,24 @@ const Chat = ({ defaultTab = 'channels' }) => {
           <button onClick={goBackToChannels} className="p-2 rounded-lg hover:bg-white/5 text-white/50">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Link to={`/user/${dmUser.id}`} className="relative hover:opacity-80">
-            {dmUser.avatar ? (
-              <img src={dmUser.avatar} alt={dmUser.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-lime-500/20" />
+          <Link to={`/user/${activeDMUser.id}`} className="relative hover:opacity-80">
+            {activeDMUser.avatar ? (
+              <img src={activeDMUser.avatar} alt={activeDMUser.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-lime-500/20" />
             ) : (
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-sm font-bold text-white">
-                {dmUser.name?.[0]}
+                {activeDMUser.name?.[0]}
               </div>
             )}
             <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0d1210] ${
-              isUserOnline(dmUser.id) ? 'bg-emerald-500' : 'bg-white/20'
+              isUserOnline(activeDMUser.id) ? 'bg-emerald-500' : 'bg-white/20'
             }`} />
           </Link>
           <div className="min-w-0 flex-1">
-            <Link to={`/user/${dmUser.id}`} className="font-semibold text-white text-sm hover:text-lime-300">
-              {dmUser.name}
+            <Link to={`/user/${activeDMUser.id}`} className="font-semibold text-white text-sm hover:text-lime-300">
+              {activeDMUser.name}
             </Link>
             <p className="text-xs text-lime-400/50">
-              {isUserOnline(dmUser.id) ? 'Online' : 'Offline'}
+              {isUserOnline(activeDMUser.id) ? 'Online' : 'Offline'}
             </p>
           </div>
         </div>
@@ -453,15 +502,12 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-[#030405] overflow-hidden">
-      {/* Background glow (subtle) */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-lime-500/[0.02] rounded-full blur-3xl" />
       </div>
 
-      {/* Mobile sidebar overlay */}
       {showSidebar && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowSidebar(false)} />}
 
-      {/* Sidebar */}
       <div className={`
         fixed lg:static z-50 h-full w-80 lg:w-72 bg-[#0d1210]/95 backdrop-blur-xl 
         border-r border-white/5 flex flex-col flex-shrink-0
@@ -475,7 +521,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
             </div>
             <div>
               <h2 className="font-bold text-white text-sm">
-                {defaultTab === 'channels' ? 'Community' : 'Messages'}
+                {isChannelTab ? 'Community' : 'Messages'}
               </h2>
               <p className="text-xs text-lime-400/50">{onlineUsers.length} online</p>
             </div>
@@ -485,16 +531,13 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </button>
         </div>
 
-        {/* Different content for Community vs Messages */}
         {renderSidebar()}
         {renderOnlineWidget()}
       </div>
 
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full overflow-hidden">
         {renderHeader()}
         {renderMessages()}
-        {/* Input area */}
         {isAuthenticated ? (
           <div className="px-4 py-4 border-t border-white/5 flex-shrink-0 bg-[#0d1210]/80">
             <form onSubmit={handleSend} className="flex items-end gap-3">
@@ -502,10 +545,17 @@ const Chat = ({ defaultTab = 'channels' }) => {
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder={dmUser ? `Message ${dmUser.name}...` : `Message #${activeRoom?.name || 'room'}...`}
+                  placeholder={
+                    activeDMUser
+                      ? `Message ${activeDMUser.name}...`
+                      : activeRoom
+                      ? `Message #${activeRoom.name}...`
+                      : 'Select a chat...'
+                  }
                   className="input-glass pr-12 py-3 rounded-full"
                   value={newMessage}
                   onChange={handleTyping}
+                  disabled={!activeRoom && !activeDMUser}
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
                   <button type="button" className="p-1.5 rounded-full hover:bg-white/5 text-white/30">
@@ -518,7 +568,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
               </div>
               <button
                 type="submit"
-                disabled={!newMessage.trim()}
+                disabled={!newMessage.trim() || (!activeRoom && !activeDMUser)}
                 className="w-11 h-11 rounded-full bg-gradient-to-br from-lime-500 to-lime-600 flex items-center justify-center hover:from-lime-400 hover:to-lime-500 transition-all disabled:opacity-20 shadow-lg shadow-lime-500/20"
               >
                 <Send className="w-5 h-5 text-white" />
