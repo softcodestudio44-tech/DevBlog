@@ -10,40 +10,24 @@ const getUserProfile = async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-        bio: true,
-        role: true,
-        github: true,
-        twitter: true,
-        linkedin: true,
-        website: true,
-        tiktok: true,
-        facebook: true,
+        id: true, name: true, email: true, avatar: true, bio: true, role: true,
+        github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true,
         createdAt: true,
       }
     });
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     const isAdmin = user.email === ADMIN_EMAIL || user.role === 'admin';
 
-    // Count only published posts
-    const postCount = await prisma.post.count({ 
-      where: { authorId: id, isDraft: false } 
-    });
+    const postCount = await prisma.post.count({ where: { authorId: id, isDraft: false } });
 
-    // Count likes on published posts
     const userPosts = await prisma.post.findMany({
       where: { authorId: id, isDraft: false },
       select: { id: true }
     });
     const postIds = userPosts.map(p => p.id);
-    const totalLikesReceived = postIds.length > 0 
+    const totalLikesReceived = postIds.length > 0
       ? await prisma.like.count({ where: { postId: { in: postIds } } })
       : 0;
 
@@ -54,43 +38,24 @@ const getUserProfile = async (req, res) => {
     let isFollowing = false;
     if (req.user && req.user.id !== id) {
       const follow = await prisma.follow.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId: req.user.id,
-            followingId: id
-          }
-        }
+        where: { followerId_followingId: { followerId: req.user.id, followingId: id } }
       });
       isFollowing = !!follow;
     }
 
     const followers = await prisma.follow.findMany({
-      where: { followingId: id },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        follower: { select: { id: true, name: true, avatar: true } }
-      }
+      where: { followingId: id }, take: 10, orderBy: { createdAt: 'desc' },
+      include: { follower: { select: { id: true, name: true, avatar: true } } }
     });
 
     const following = await prisma.follow.findMany({
-      where: { followerId: id },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        following: { select: { id: true, name: true, avatar: true } }
-      }
+      where: { followerId: id }, take: 10, orderBy: { createdAt: 'desc' },
+      include: { following: { select: { id: true, name: true, avatar: true } } }
     });
 
     res.json({
-      ...user,
-      isAdmin,
-      postCount,
-      likeCount: totalLikesReceived,
-      commentCount,
-      followersCount,
-      followingCount,
-      isFollowing,
+      ...user, isAdmin, postCount, likeCount: totalLikesReceived,
+      commentCount, followersCount, followingCount, isFollowing,
       followersList: followers.map(f => f.follower),
       followingList: following.map(f => f.following),
     });
@@ -121,19 +86,12 @@ const updateProfile = async (req, res) => {
 const getUserPosts = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Only show published posts on public profile
-    // If viewing own profile, show drafts too
     const whereClause = { authorId: id };
-    if (!req.user || req.user.id !== id) {
-      whereClause.isDraft = false;
-    }
+    if (!req.user || req.user.id !== id) whereClause.isDraft = false;
 
     const posts = await prisma.post.findMany({
       where: whereClause,
-      include: {
-        author: { select: { id: true, name: true, avatar: true } },
-      },
+      include: { author: { select: { id: true, name: true, avatar: true } } },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -167,8 +125,10 @@ const uploadAvatar = async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatar: result.secure_url },
-      select: { id: true, name: true, email: true, avatar: true, bio: true, role: true,
-        github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true },
+      select: {
+        id: true, name: true, email: true, avatar: true, bio: true, role: true,
+        github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true,
+      },
     });
 
     res.json({ message: 'Avatar uploaded', user });
@@ -190,11 +150,17 @@ const followUser = async (req, res) => {
 
     const { createNotification } = require('./notificationController');
     await createNotification({
-      userId: id, type: 'follow', message: `${req.user.name} started following you`, actorId: followerId,
+      userId: id, type: 'follow',
+      message: `${req.user.name} started following you`,
+      actorId: followerId,
     });
 
-    const io = req.app.get('io');
-    if (io) io.emit('follow-update', { followerId, followingId: id, action: 'follow' });
+    // Emit to specific user rooms for targeted real-time updates
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(`user:${id}`).emit('follow-update', { followerId, followingId: id, action: 'follow' });
+      io.to(`user:${followerId}`).emit('follow-update', { followerId, followingId: id, action: 'follow' });
+    }
 
     res.json({ message: 'Followed successfully', follow });
   } catch (error) {
@@ -212,8 +178,11 @@ const unfollowUser = async (req, res) => {
       where: { followerId_followingId: { followerId, followingId: id } },
     });
 
-    const io = req.app.get('io');
-    if (io) io.emit('follow-update', { followerId, followingId: id, action: 'unfollow' });
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(`user:${id}`).emit('follow-update', { followerId, followingId: id, action: 'unfollow' });
+      io.to(`user:${followerId}`).emit('follow-update', { followerId, followingId: id, action: 'unfollow' });
+    }
 
     res.json({ message: 'Unfollowed successfully' });
   } catch (error) {

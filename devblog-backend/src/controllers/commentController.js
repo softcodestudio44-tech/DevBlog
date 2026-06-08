@@ -1,5 +1,5 @@
 const prisma = require('../config/database');
-const { createNotification } = require('../controllers/notificationController');
+const { createNotification } = require('./notificationController');
 
 const getComments = async (req, res) => {
   try {
@@ -68,6 +68,12 @@ const createComment = async (req, res) => {
       });
     }
 
+    // Emit socket event for real-time comment updates
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.emit('new-comment', { postId, comment });
+    }
+
     res.status(201).json({ message: 'Comment added', comment });
   } catch (error) {
     console.error('Create comment error:', error);
@@ -77,16 +83,15 @@ const createComment = async (req, res) => {
 
 const deleteComment = async (req, res) => {
   try {
-    const { postId, id } = req.params;
+    const { id } = req.params;
 
-    const comment = await prisma.comment.findUnique({ 
+    const comment = await prisma.comment.findUnique({
       where: { id },
       include: { post: { select: { authorId: true } } }
     });
 
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
 
-    // Allow: comment author, post owner, or admin
     const isCommentAuthor = comment.authorId === req.user.id;
     const isPostOwner = comment.post.authorId === req.user.id;
     const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
@@ -96,6 +101,13 @@ const deleteComment = async (req, res) => {
     }
 
     await prisma.comment.delete({ where: { id } });
+
+    // Emit socket event for real-time comment deletion
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.emit('comment-deleted', { postId: comment.postId, commentId: id });
+    }
+
     res.json({ message: 'Comment deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

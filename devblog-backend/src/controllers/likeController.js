@@ -1,5 +1,5 @@
 const prisma = require('../config/database');
-const { createNotification } = require('../controllers/notificationController');
+const { createNotification } = require('./notificationController');
 
 const toggleLike = async (req, res) => {
   try {
@@ -19,6 +19,13 @@ const toggleLike = async (req, res) => {
       await prisma.like.delete({
         where: { id: existingLike.id },
       });
+
+      // Emit socket event for real-time like count update
+      const io = req.app.get('io') || global.io;
+      if (io) {
+        io.emit('post-liked', { postId, userId, action: 'unlike' });
+      }
+
       res.json({ message: 'Post unliked', liked: false });
     } else {
       await prisma.like.create({
@@ -40,6 +47,12 @@ const toggleLike = async (req, res) => {
           sourceType: 'post',
           actorId: userId,
         });
+      }
+
+      // Emit socket event for real-time like count update
+      const io = req.app.get('io') || global.io;
+      if (io) {
+        io.emit('post-liked', { postId, userId, action: 'like' });
       }
 
       res.json({ message: 'Post liked', liked: true });
