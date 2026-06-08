@@ -55,6 +55,7 @@ model Post {
   content   String
   tags      String[]
   images    String[]
+  isDraft   Boolean   @default(false)  // <-- ADDED: Draft status
   authorId  String
   author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes     Like[]

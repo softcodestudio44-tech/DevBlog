@@ -32,35 +32,20 @@ const getUserProfile = async (req, res) => {
 
     const isAdmin = user.email === ADMIN_EMAIL || user.role === 'admin';
 
-    // Count posts - handle missing isDraft field
-    let postCount = 0;
-    try {
-      postCount = await prisma.post.count({ where: { authorId: id, isDraft: false } });
-    } catch (e) {
-      postCount = await prisma.post.count({ where: { authorId: id } });
-    }
+    // Count only published posts
+    const postCount = await prisma.post.count({ 
+      where: { authorId: id, isDraft: false } 
+    });
 
     // Count likes on published posts
-    let totalLikesReceived = 0;
-    try {
-      const userPosts = await prisma.post.findMany({
-        where: { authorId: id, isDraft: false },
-        select: { id: true }
-      });
-      const postIds = userPosts.map(p => p.id);
-      totalLikesReceived = postIds.length > 0 
-        ? await prisma.like.count({ where: { postId: { in: postIds } } })
-        : 0;
-    } catch (e) {
-      const userPosts = await prisma.post.findMany({
-        where: { authorId: id },
-        select: { id: true }
-      });
-      const postIds = userPosts.map(p => p.id);
-      totalLikesReceived = postIds.length > 0 
-        ? await prisma.like.count({ where: { postId: { in: postIds } } })
-        : 0;
-    }
+    const userPosts = await prisma.post.findMany({
+      where: { authorId: id, isDraft: false },
+      select: { id: true }
+    });
+    const postIds = userPosts.map(p => p.id);
+    const totalLikesReceived = postIds.length > 0 
+      ? await prisma.like.count({ where: { postId: { in: postIds } } })
+      : 0;
 
     const commentCount = await prisma.comment.count({ where: { authorId: id } });
     const followersCount = await prisma.follow.count({ where: { followingId: id } });
@@ -137,21 +122,20 @@ const getUserPosts = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Try with isDraft filter, fallback to all posts
-    let posts = [];
-    try {
-      posts = await prisma.post.findMany({
-        where: { authorId: id, isDraft: false },
-        include: { author: { select: { id: true, name: true, avatar: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
-    } catch (e) {
-      posts = await prisma.post.findMany({
-        where: { authorId: id },
-        include: { author: { select: { id: true, name: true, avatar: true } } },
-        orderBy: { createdAt: 'desc' }
-      });
+    // Only show published posts on public profile
+    // If viewing own profile, show drafts too
+    const whereClause = { authorId: id };
+    if (!req.user || req.user.id !== id) {
+      whereClause.isDraft = false;
     }
+
+    const posts = await prisma.post.findMany({
+      where: whereClause,
+      include: {
+        author: { select: { id: true, name: true, avatar: true } },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     const postsWithCounts = await Promise.all(
       posts.map(async (post) => {

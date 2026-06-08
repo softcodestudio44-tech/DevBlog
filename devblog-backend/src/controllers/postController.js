@@ -3,19 +3,8 @@ const { cloudinary } = require('../config/cloudinary');
 
 const getAllPosts = async (req, res) => {
   try {
-    // Check if isDraft field exists in schema
-    let whereClause = {};
-    try {
-      // Try to filter by isDraft - if field doesn't exist, this will fail
-      await prisma.post.findFirst({ where: { isDraft: false } });
-      whereClause = { isDraft: false };
-    } catch (e) {
-      // isDraft field doesn't exist, fetch all posts
-      whereClause = {};
-    }
-
     const posts = await prisma.post.findMany({
-      where: whereClause,
+      where: { isDraft: false },
       include: {
         author: { select: { id: true, name: true, email: true, avatar: true } },
       },
@@ -52,6 +41,11 @@ const getPostById = async (req, res) => {
 
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
+    // Don't show drafts to others (only author can see their own draft)
+    if (post.isDraft && (!req.user || req.user.id !== post.authorId)) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
     const likeCount = await prisma.like.count({ where: { postId: post.id } });
     const commentCount = await prisma.comment.count({ where: { postId: post.id } });
 
@@ -70,29 +64,15 @@ const createPost = async (req, res) => {
   try {
     const { title, content, tags, images, isDraft } = req.body;
 
-    // Build data object dynamically based on schema
-    const data = {
-      title,
-      content,
-      tags: tags || [],
-      images: images || [],
-      authorId: req.user.id,
-    };
-
-    // Only add isDraft if it exists in schema (check by trying)
-    if (isDraft !== undefined) {
-      try {
-        // Test if isDraft field exists
-        await prisma.post.findFirst({ where: { isDraft: false } });
-        data.isDraft = isDraft;
-      } catch (e) {
-        // Field doesn't exist, skip it
-        console.log('isDraft field not in schema, skipping');
-      }
-    }
-
     const post = await prisma.post.create({
-      data,
+      data: {
+        title,
+        content,
+        tags: tags || [],
+        images: images || [],
+        isDraft: isDraft || false,
+        authorId: req.user.id,
+      },
       include: { author: { select: { id: true, name: true, email: true, avatar: true } } },
     });
     res.status(201).json({ message: isDraft ? 'Draft saved' : 'Post created', post });
