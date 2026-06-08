@@ -9,6 +9,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CreatePost from './pages/CreatePost';
+import EditPost from './pages/EditPost';  // NEW: Edit post page
 import PostDetail from './pages/PostDetail';
 import UserProfile from './pages/UserProfile';
 import EditProfile from './pages/EditProfile';
@@ -35,6 +36,7 @@ function AppContent() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/create" element={<CreatePost />} />
+            <Route path="/edit-post/:id" element={<EditPost />} />  {/* NEW */}
             <Route path="/post/:id" element={<PostDetail />} />
             <Route path="/user/:id" element={<UserProfile />} />
             <Route path="/edit-profile" element={<EditProfile />} />

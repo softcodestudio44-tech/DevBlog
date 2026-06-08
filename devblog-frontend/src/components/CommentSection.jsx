@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, CornerDownRight, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 }) => {
   const { user, isAuthenticated } = useAuth();
@@ -50,7 +51,6 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
       className={`${depth > 0 ? 'ml-8 border-l-2 border-emerald-500/20 pl-4' : ''}`}
     >
       <div className="flex gap-3 mb-3">
-        {/* Clickable Avatar */}
         <Link to={`/user/${comment.authorId}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
           {comment.author && comment.author.avatar ? (
             <img 
@@ -74,7 +74,6 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
                 <button
                   onClick={handleDelete}
                   className="text-white/30 hover:text-red-400 transition-colors ml-2"
-                  title={isPostOwner && !isCommentAuthor ? "Delete as post owner" : "Delete your comment"}
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -104,7 +103,6 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
         </div>
       </div>
 
-      {/* Reply Form */}
       <AnimatePresence>
         {replying && (
           <motion.form
@@ -134,7 +132,6 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
         )}
       </AnimatePresence>
 
-      {/* Nested Replies */}
       {showReplies && comment.replies && comment.replies.map((reply) => (
         <CommentItem
           key={reply.id}
@@ -151,6 +148,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
 
 const CommentSection = ({ postId, postAuthorId }) => {
   const { user, isAuthenticated } = useAuth();
+  const { socket } = useSocket();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -170,6 +168,31 @@ const CommentSection = ({ postId, postAuthorId }) => {
       fetchComments();
     }
   }, [postId]);
+
+  // Listen for external comments on this post
+  useEffect(() => {
+    if (!socket || !postId) return;
+
+    const handleNewComment = (data) => {
+      if (data.postId === postId) {
+        fetchComments();
+      }
+    };
+
+    const handleCommentDeleted = (data) => {
+      if (data.postId === postId) {
+        fetchComments();
+      }
+    };
+
+    socket.on('new-comment', handleNewComment);
+    socket.on('comment-deleted', handleCommentDeleted);
+
+    return () => {
+      socket.off('new-comment', handleNewComment);
+      socket.off('comment-deleted', handleCommentDeleted);
+    };
+  }, [socket, postId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -196,7 +219,6 @@ const CommentSection = ({ postId, postAuthorId }) => {
         </h3>
       </div>
 
-      {/* Add Comment */}
       {isAuthenticated ? (
         <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
           <Link to={`/user/${user ? user.id : ''}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
@@ -231,7 +253,6 @@ const CommentSection = ({ postId, postAuthorId }) => {
         </div>
       )}
 
-      {/* Comments List */}
       <div className="space-y-4">
         {comments.map((comment) => (
           <CommentItem

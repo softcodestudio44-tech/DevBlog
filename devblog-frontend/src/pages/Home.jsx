@@ -6,9 +6,11 @@ import api from '../api/axios';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 const Home = () => {
   const { isAuthenticated } = useAuth();
+  const { socket } = useSocket();
   const navigate = useNavigate();
   const postsRef = useRef(null);
   const [posts, setPosts] = useState([]);
@@ -18,6 +20,78 @@ const Home = () => {
   useEffect(() => {
     fetchPosts();
   }, []);
+
+  // Real-time socket listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewPost = (data) => {
+      // Prepend new post to feed without refresh
+      setPosts((prev) => {
+        // Check if post already exists (avoid duplicates)
+        if (prev.find((p) => p.id === data.post.id)) return prev;
+        return [data.post, ...prev];
+      });
+    };
+
+    const handlePostUpdated = (data) => {
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === data.post.id ? { ...data.post } : post
+        )
+      );
+    };
+
+    const handlePostDeleted = (data) => {
+      setPosts((prev) => prev.filter((post) => post.id !== data.postId));
+    };
+
+    const handlePostLiked = (data) => {
+      // Update like count in real-time
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (post.id === data.postId) {
+            return {
+              ...post,
+              likeCount: data.action === 'like'
+                ? (post.likeCount || 0) + 1
+                : Math.max(0, (post.likeCount || 0) - 1),
+            };
+          }
+          return post;
+        })
+      );
+    };
+
+    const handleNewComment = (data) => {
+      // Update comment count in real-time
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (post.id === data.postId) {
+            return {
+              ...post,
+              commentCount: (post.commentCount || 0) + 1,
+            };
+          }
+          return post;
+        })
+      );
+    };
+
+    socket.on('new-post', handleNewPost);
+    socket.on('post-updated', handlePostUpdated);
+    socket.on('post-deleted', handlePostDeleted);
+    socket.on('post-liked', handlePostLiked);
+    socket.on('new-comment', handleNewComment);
+
+    return () => {
+      socket.off('new-post', handleNewPost);
+      socket.off('post-updated', handlePostUpdated);
+      socket.off('post-deleted', handlePostDeleted);
+      socket.off('post-liked', handlePostLiked);
+      socket.off('new-comment', handleNewComment);
+    };
+  }, [socket]);
 
   const fetchPosts = async () => {
     try {

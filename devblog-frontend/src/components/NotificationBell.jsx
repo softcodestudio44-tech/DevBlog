@@ -3,20 +3,42 @@ import { Link } from 'react-router-dom';
 import { Bell, Heart, MessageCircle, AtSign, UserPlus, Check } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 const NotificationBell = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { socket } = useSocket();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Initial fetch
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, [isAuthenticated]);
+
+  // Real-time socket listener for new notifications
+  useEffect(() => {
+    if (!socket || !user) return;
+
+    const handleNewNotification = (data) => {
+      // Prepend new notification
+      setNotifications((prev) => {
+        // Avoid duplicates
+        if (prev.find((n) => n.id === data.id)) return prev;
+        return [data, ...prev];
+      });
+      setUnreadCount((prev) => prev + 1);
+    };
+
+    socket.on('new-notification', handleNewNotification);
+
+    return () => {
+      socket.off('new-notification', handleNewNotification);
+    };
+  }, [socket, user]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -79,7 +101,7 @@ const NotificationBell = () => {
       >
         <Bell className="w-5 h-5 text-white/40" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

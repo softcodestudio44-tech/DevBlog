@@ -17,17 +17,23 @@ const CreatePost = () => {
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
+  // Load localStorage draft on mount
   useEffect(() => {
     const draft = localStorage.getItem('postDraft');
     if (draft) {
-      const parsed = JSON.parse(draft);
-      setTitle(parsed.title || '');
-      setContent(parsed.content || '');
-      setTags(parsed.tags || '');
-      setImages(parsed.images || []);
+      try {
+        const parsed = JSON.parse(draft);
+        setTitle(parsed.title || '');
+        setContent(parsed.content || '');
+        setTags(parsed.tags || '');
+        setImages(parsed.images || []);
+      } catch (e) {
+        console.error('Error parsing draft:', e);
+      }
     }
   }, []);
 
+  // Auto-save to localStorage every 3 seconds
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (title || content) {
@@ -73,7 +79,6 @@ const CreatePost = () => {
         content,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         images,
-        isDraft: false,
       });
 
       localStorage.removeItem('postDraft');
@@ -86,27 +91,14 @@ const CreatePost = () => {
     }
   };
 
-  const handleSaveDraft = async () => {
-    if (!title.trim()) return;
-
-    setSavingDraft(true);
-    try {
-      await api.post('/posts', {
-        title,
-        content,
-        tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-        images,
-        isDraft: true,
-      });
-
-      localStorage.removeItem('postDraft');
-      alert('Draft saved to server!');
-    } catch (error) {
-      console.error('Save draft error:', error);
-      alert('Failed to save draft');
-    } finally {
-      setSavingDraft(false);
+  // Save draft to localStorage only (no server)
+  const handleSaveDraft = () => {
+    if (!title.trim()) {
+      alert('Please add a title before saving draft');
+      return;
     }
+    localStorage.setItem('postDraft', JSON.stringify({ title, content, tags, images }));
+    alert('Draft saved locally!');
   };
 
   const handleDiscard = () => {

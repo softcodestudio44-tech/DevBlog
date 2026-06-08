@@ -3,9 +3,7 @@ import React from 'react';
 const MarkdownRenderer = ({ content }) => {
   if (!content) return null;
 
-  // Simple markdown parser
   const parseMarkdown = (text) => {
-    // Split by lines
     const lines = text.split('\n');
 
     return lines.map((line, index) => {

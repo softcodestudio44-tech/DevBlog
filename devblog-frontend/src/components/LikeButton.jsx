@@ -1,11 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 const LikeButton = ({ postId, initialCount = 0 }) => {
   const { isAuthenticated } = useAuth();
+  const { socket } = useSocket();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
@@ -13,6 +16,22 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
   useEffect(() => {
     fetchLikeStatus();
   }, [postId]);
+
+  // Listen for external like events (other users liking this post)
+  useEffect(() => {
+    if (!socket || !postId) return;
+
+    const handlePostLiked = (data) => {
+      if (data.postId === postId) {
+        setCount((prev) =>
+          data.action === 'like' ? prev + 1 : Math.max(0, prev - 1)
+        );
+      }
+    };
+
+    socket.on('post-liked', handlePostLiked);
+    return () => socket.off('post-liked', handlePostLiked);
+  }, [socket, postId]);
 
   const fetchLikeStatus = async () => {
     try {

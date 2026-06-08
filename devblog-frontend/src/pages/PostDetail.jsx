@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, Tag, Heart, MessageCircle, Share2, Trash2, Edit3 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import CommentSection from '../components/CommentSection';
@@ -14,6 +15,7 @@ const PostDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { socket } = useSocket();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -26,6 +28,47 @@ const PostDetail = () => {
   useEffect(() => {
     fetchPost();
   }, [id]);
+
+  // Real-time socket listeners
+  useEffect(() => {
+    if (!socket || !id) return;
+
+    const handlePostUpdated = (data) => {
+      if (data.post.id === id) {
+        setPost((prev) => ({ ...prev, ...data.post }));
+      }
+    };
+
+    const handlePostLiked = (data) => {
+      if (data.postId === id && post) {
+        setPost((prev) => ({
+          ...prev,
+          likeCount: data.action === 'like'
+            ? (prev.likeCount || 0) + 1
+            : Math.max(0, (prev.likeCount || 0) - 1),
+        }));
+      }
+    };
+
+    const handleNewComment = (data) => {
+      if (data.postId === id && post) {
+        setPost((prev) => ({
+          ...prev,
+          commentCount: (prev.commentCount || 0) + 1,
+        }));
+      }
+    };
+
+    socket.on('post-updated', handlePostUpdated);
+    socket.on('post-liked', handlePostLiked);
+    socket.on('new-comment', handleNewComment);
+
+    return () => {
+      socket.off('post-updated', handlePostUpdated);
+      socket.off('post-liked', handlePostLiked);
+      socket.off('new-comment', handleNewComment);
+    };
+  }, [socket, id, post]);
 
   const fetchPost = async () => {
     try {
@@ -156,8 +199,10 @@ const PostDetail = () => {
                 </div>
               </div>
 
-              {/* Title */}
-              <h1 className="text-3xl font-bold mb-4 text-white">{post.title}</h1>
+              {/* Title with Markdown rendering */}
+              <h1 className="text-3xl font-bold mb-4 text-white">
+                <MarkdownRenderer content={post.title} />
+              </h1>
 
               {/* Tags */}
               {post.tags && post.tags.length > 0 && (
