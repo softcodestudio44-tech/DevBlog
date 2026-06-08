@@ -20,7 +20,6 @@ const PostDetail = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
-  // Scroll to top when page loads
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
@@ -118,7 +117,7 @@ const PostDetail = () => {
     return (
       <div className="min-h-screen pt-24 px-4 flex items-center justify-center">
         <GlassCard className="text-center py-12">
-          <p className="text-white/60 text-lg">Post not found</p>
+          <p className="text-white text-lg">Post not found</p>
           <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
             Back to posts
           </Link>
@@ -142,7 +141,7 @@ const PostDetail = () => {
           >
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
+              className="inline-flex items-center gap-2 text-white hover:text-emerald-300 transition-colors mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to posts
@@ -169,7 +168,7 @@ const PostDetail = () => {
                     <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-emerald-300 transition-colors">
                       {post.author?.name || 'Unknown'}
                     </Link>
-                    <div className="flex items-center gap-1 text-xs text-white/40">
+                    <div className="flex items-center gap-1 text-xs text-white/60">
                       <Clock className="w-3 h-3" />
                       {formatDate(post.createdAt)}
                     </div>
@@ -181,7 +180,7 @@ const PostDetail = () => {
                     <button
                       onClick={handleDelete}
                       disabled={deleting}
-                      className="p-2 rounded-xl hover:bg-red-500/10 text-white/30 hover:text-red-400 transition-colors"
+                      className="p-2 rounded-xl hover:bg-red-500/10 text-white hover:text-red-400 transition-colors"
                       title="Delete post"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -190,7 +189,7 @@ const PostDetail = () => {
                   {isAuthor && (
                     <Link
                       to={`/edit-post/${id}`}
-                      className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-emerald-300 transition-colors"
+                      className="p-2 rounded-xl hover:bg-white/5 text-white hover:text-emerald-300 transition-colors"
                       title="Edit post"
                     >
                       <Edit3 className="w-4 h-4" />
@@ -240,11 +239,11 @@ const PostDetail = () => {
               {/* Actions */}
               <div className="flex items-center gap-4 pt-6 border-t border-white/10">
                 <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
-                <button className="flex items-center gap-2 text-white/40 hover:text-emerald-300 transition-colors">
+                <button className="flex items-center gap-2 text-white hover:text-emerald-300 transition-colors">
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-sm">{post.commentCount || 0}</span>
                 </button>
-                <button className="flex items-center gap-2 text-white/40 hover:text-emerald-300 transition-colors ml-auto">
+                <button className="flex items-center gap-2 text-white hover:text-emerald-300 transition-colors ml-auto">
                   <Share2 className="w-5 h-5" />
                   <span className="text-sm">Share</span>
                 </button>

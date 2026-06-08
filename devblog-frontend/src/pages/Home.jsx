@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Tag, ArrowRight, Sparkles, Code2, Terminal, Braces, Database, Globe, Heart, MessageCircle } from 'lucide-react';
+import { Clock, Tag, ArrowRight, Sparkles, Code2, Terminal, Braces, Database, Globe, Heart, MessageCircle, Search } from 'lucide-react';
 import api from '../api/axios';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 
@@ -16,6 +17,7 @@ const Home = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -26,9 +28,7 @@ const Home = () => {
     if (!socket) return;
 
     const handleNewPost = (data) => {
-      // Prepend new post to feed without refresh
       setPosts((prev) => {
-        // Check if post already exists (avoid duplicates)
         if (prev.find((p) => p.id === data.post.id)) return prev;
         return [data.post, ...prev];
       });
@@ -47,7 +47,6 @@ const Home = () => {
     };
 
     const handlePostLiked = (data) => {
-      // Update like count in real-time
       setPosts((prev) =>
         prev.map((post) => {
           if (post.id === data.postId) {
@@ -64,7 +63,6 @@ const Home = () => {
     };
 
     const handleNewComment = (data) => {
-      // Update comment count in real-time
       setPosts((prev) =>
         prev.map((post) => {
           if (post.id === data.postId) {
@@ -184,23 +182,30 @@ const Home = () => {
           <span className="text-white"> Share.</span>
         </h1>
 
-        <p className="text-lg text-white/60 max-w-2xl mx-auto mb-8 leading-relaxed">
+        <p className="text-lg text-white max-w-2xl mx-auto mb-8 leading-relaxed">
           Join thousands of developers sharing knowledge, tutorials, and insights. 
           Your code journey starts here.
         </p>
 
-        {/* Search Bar */}
+        {/* Search Bar - Fixed */}
         <div className="max-w-lg mx-auto mb-8">
           <div className="relative">
             <input
               type="text"
               placeholder="Search posts by title, content, or tags..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 pl-12 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 pl-12 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchActive(true)}
+              onBlur={() => setSearchActive(false)}
             />
-            <Code2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${searchActive ? 'text-emerald-400' : 'text-white/50'}`} />
           </div>
+          {searchQuery && (
+            <p className="text-sm text-emerald-400 mt-2">
+              {filteredPosts.length} result{filteredPosts.length !== 1 ? 's' : ''} found
+            </p>
+          )}
         </div>
 
         {/* Code preview card */}
@@ -214,7 +219,7 @@ const Home = () => {
             <div className="w-3 h-3 rounded-full bg-red-500" />
             <div className="w-3 h-3 rounded-full bg-yellow-500" />
             <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="text-xs text-white/40 ml-2 font-mono">devblog.js</span>
+            <span className="text-xs text-white/50 ml-2 font-mono">devblog.js</span>
           </div>
           <pre className="font-mono text-sm text-emerald-300 overflow-x-auto">
             <code>{`const developer = {
@@ -254,19 +259,19 @@ const Home = () => {
       >
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">1K+</div>
-          <div className="text-sm text-white/60">Developers</div>
+          <div className="text-sm text-white">Developers</div>
         </div>
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">500+</div>
-          <div className="text-sm text-white/60">Articles</div>
+          <div className="text-sm text-white">Articles</div>
         </div>
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">50+</div>
-          <div className="text-sm text-white/60">Topics</div>
+          <div className="text-sm text-white">Topics</div>
         </div>
         <div className="text-center">
           <div className="text-3xl font-bold gradient-text">24/7</div>
-          <div className="text-sm text-white/60">Community</div>
+          <div className="text-sm text-white">Community</div>
         </div>
       </motion.div>
 
@@ -275,9 +280,9 @@ const Home = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-semibold text-white">Latest Posts</h2>
-            <p className="text-white/50 text-sm mt-1">Fresh from the community</p>
+            <p className="text-white text-sm mt-1">Fresh from the community</p>
           </div>
-          <div className="text-white/50 text-sm">{filteredPosts.length} posts</div>
+          <div className="text-white text-sm">{filteredPosts.length} posts</div>
         </div>
 
         {loading ? (
@@ -289,55 +294,59 @@ const Home = () => {
         ) : filteredPosts.length === 0 ? (
           <GlassCard className="text-center py-16">
             <Code2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-            <p className="text-white/60 text-lg">No posts found. Try a different search!</p>
+            <p className="text-white text-lg">No posts found. Try a different search!</p>
           </GlassCard>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPosts.map((post, index) => (
               <GlassCard key={post.id} delay={index * 0.1}>
-                <Link to={`/post/${post.id}`} className="flex flex-col h-full cursor-pointer">
+                <div className="flex flex-col h-full">
                   <div className="flex items-center gap-2 mb-4">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
-                        {post.author?.avatar ? (
-                          <img 
-                            src={post.author.avatar} 
-                            alt={post.author.name} 
-                            className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
-                            {post.author?.name?.[0] || 'U'}
-                          </div>
-                        )}
-                      </Link>
-                    </div>
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white/80 hover:text-emerald-300 transition-colors">
+                    <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
+                      {post.author?.avatar ? (
+                        <img 
+                          src={post.author.avatar} 
+                          alt={post.author.name} 
+                          className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+                          {post.author?.name?.[0] || 'U'}
+                        </div>
+                      )}
+                    </Link>
+                    <div>
+                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-emerald-300 transition-colors">
                         {post.author?.name || 'Unknown'}
                       </Link>
-                      <div className="flex items-center gap-1 text-xs text-white/40">
+                      <div className="flex items-center gap-1 text-xs text-white/60">
                         <Clock className="w-3 h-3" />
                         {formatDate(post.createdAt)}
                       </div>
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-semibold mb-3 text-white line-clamp-2">{post.title}</h3>
-                  <p className="text-white/50 text-sm mb-4 line-clamp-3 flex-grow">{post.content}</p>
+                  <Link to={`/post/${post.id}`} className="flex-grow">
+                    <h3 className="text-xl font-semibold mb-3 text-white line-clamp-2 hover:text-emerald-300 transition-colors">
+                      <MarkdownRenderer content={post.title} />
+                    </h3>
+                    <p className="text-white text-sm mb-4 line-clamp-3">{post.content}</p>
+                  </Link>
 
-                  {/* Post Images Preview - object-contain to show full image */}
+                  {/* Post Images Preview */}
                   {post.images && post.images.length > 0 && (
-                    <div className="mb-4 rounded-lg overflow-hidden bg-white/5">
-                      <img 
-                        src={post.images[0]} 
-                        alt={post.title}
-                        className="w-full h-48 object-contain"
-                      />
-                      {post.images.length > 1 && (
-                        <p className="text-xs text-white/30 mt-1 text-center">+{post.images.length - 1} more</p>
-                      )}
-                    </div>
+                    <Link to={`/post/${post.id}`} className="mb-4 block">
+                      <div className="rounded-lg overflow-hidden bg-white/5">
+                        <img 
+                          src={post.images[0]} 
+                          alt={post.title}
+                          className="w-full h-48 object-contain"
+                        />
+                        {post.images.length > 1 && (
+                          <p className="text-xs text-white/50 mt-1 text-center">+{post.images.length - 1} more</p>
+                        )}
+                      </div>
+                    </Link>
                   )}
 
                   <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
@@ -350,17 +359,17 @@ const Home = () => {
                       ))}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-white/40">
-                        <Heart className="w-4 h-4" />
-                        <span className="text-xs">{post.likeCount || 0}</span>
-                      </span>
-                      <span className="flex items-center gap-1 text-white/40">
+                      {/* Like button clickable from feed */}
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
+                      </div>
+                      <Link to={`/post/${post.id}`} className="flex items-center gap-1 text-white hover:text-emerald-300 transition-colors">
                         <MessageCircle className="w-4 h-4" />
                         <span className="text-xs">{post.commentCount || 0}</span>
-                      </span>
+                      </Link>
                     </div>
                   </div>
-                </Link>
+                </div>
               </GlassCard>
             ))}
           </div>

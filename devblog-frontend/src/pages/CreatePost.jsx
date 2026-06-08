@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Send, Loader2, Image, X } from 'lucide-react';
+import { Send, Loader2, Image, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import SEO from '../components/SEO';
@@ -15,7 +15,6 @@ const CreatePost = () => {
   const [images, setImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [savingDraft, setSavingDraft] = useState(false);
 
   // Load localStorage draft on mount
   useEffect(() => {
@@ -91,16 +90,6 @@ const CreatePost = () => {
     }
   };
 
-  // Save draft to localStorage only (no server)
-  const handleSaveDraft = () => {
-    if (!title.trim()) {
-      alert('Please add a title before saving draft');
-      return;
-    }
-    localStorage.setItem('postDraft', JSON.stringify({ title, content, tags, images }));
-    alert('Draft saved locally!');
-  };
-
   const handleDiscard = () => {
     if (window.confirm('Discard this draft?')) {
       setTitle('');
@@ -122,17 +111,9 @@ const CreatePost = () => {
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={handleDiscard}
-                className="px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/[0.05] transition-all border border-white/10"
+                className="px-4 py-2 rounded-xl text-sm text-white hover:text-white hover:bg-white/[0.05] transition-all border border-white/10"
               >
                 Discard
-              </button>
-              <button
-                onClick={handleSaveDraft}
-                disabled={savingDraft || !title.trim()}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm bg-white/[0.05] border border-white/10 text-white/70 hover:text-white hover:bg-white/[0.08] transition-all disabled:opacity-30"
-              >
-                {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save Draft
               </button>
               <button
                 onClick={handlePublish}
@@ -149,7 +130,7 @@ const CreatePost = () => {
             <input
               type="text"
               placeholder="Post title..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -157,7 +138,7 @@ const CreatePost = () => {
             <input
               type="text"
               placeholder="Tags (comma separated)..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
             />
@@ -165,11 +146,11 @@ const CreatePost = () => {
             {/* Image Upload */}
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-white/60">Images ({images.length})</span>
+                <span className="text-sm text-white">Images ({images.length})</span>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImages}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-sm disabled:opacity-30"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-white hover:text-white hover:bg-white/[0.08] transition-all text-sm disabled:opacity-30"
                 >
                   <Image className="w-4 h-4" />
                   {uploadingImages ? 'Uploading...' : 'Add Images'}
@@ -204,13 +185,13 @@ const CreatePost = () => {
 
             <textarea
               placeholder="Write your post content in Markdown..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
 
             {title && (
-              <p className="text-xs text-white/30">
+              <p className="text-xs text-white/50">
                 Auto-saving to local draft...
               </p>
             )}

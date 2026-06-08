@@ -24,9 +24,7 @@ const NotificationBell = () => {
     if (!socket || !user) return;
 
     const handleNewNotification = (data) => {
-      // Prepend new notification
       setNotifications((prev) => {
-        // Avoid duplicates
         if (prev.find((n) => n.id === data.id)) return prev;
         return [data, ...prev];
       });
@@ -87,7 +85,7 @@ const NotificationBell = () => {
       case 'reply': return <MessageCircle className="w-4 h-4 text-emerald-400" />;
       case 'follow': return <UserPlus className="w-4 h-4 text-purple-400" />;
       case 'mention': return <AtSign className="w-4 h-4 text-yellow-400" />;
-      default: return <Bell className="w-4 h-4 text-white/40" />;
+      default: return <Bell className="w-4 h-4 text-white" />;
     }
   };
 
@@ -99,7 +97,7 @@ const NotificationBell = () => {
         onClick={() => setOpen(!open)}
         className="relative p-2 rounded-xl hover:bg-white/[0.03] transition-all"
       >
-        <Bell className="w-5 h-5 text-white/40" />
+        <Bell className="w-5 h-5 text-white" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -119,13 +117,13 @@ const NotificationBell = () => {
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="flex items-center gap-1 text-xs text-emerald-400/60 hover:text-emerald-400 transition-colors"
+                      className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
                     >
                       <Check className="w-3 h-3" />
                       Mark all
                     </button>
                   )}
-                  <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-white/5 text-white/30">
+                  <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-white/5 text-white">
                     <span className="text-lg leading-none">&times;</span>
                   </button>
                 </div>
@@ -133,8 +131,8 @@ const NotificationBell = () => {
               <div className="overflow-y-auto flex-1">
                 {notifications.length === 0 ? (
                   <div className="p-8 text-center">
-                    <Bell className="w-8 h-8 text-white/10 mx-auto mb-2" />
-                    <p className="text-sm text-white/20">No notifications yet</p>
+                    <Bell className="w-8 h-8 text-white/30 mx-auto mb-2" />
+                    <p className="text-sm text-white/50">No notifications yet</p>
                   </div>
                 ) : (
                   notifications.map((notification) => (
@@ -148,8 +146,8 @@ const NotificationBell = () => {
                       <div className="flex gap-3">
                         <div className="flex-shrink-0 mt-0.5">{getIcon(notification.type)}</div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white/70 leading-relaxed">{notification.message}</p>
-                          <p className="text-[11px] text-white/20 mt-1">
+                          <p className="text-sm text-white leading-relaxed">{notification.message}</p>
+                          <p className="text-[11px] text-white/50 mt-1">
                             {new Date(notification.createdAt).toLocaleDateString()}
                           </p>
                         </div>
@@ -170,7 +168,7 @@ const NotificationBell = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="flex items-center gap-1 text-xs text-emerald-400/60 hover:text-emerald-400 transition-colors"
+                  className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
                   <Check className="w-3 h-3" />
                   Mark all read
@@ -180,8 +178,8 @@ const NotificationBell = () => {
             <div className="max-h-80 overflow-y-auto relative z-10">
               {notifications.length === 0 ? (
                 <div className="p-8 text-center">
-                  <Bell className="w-8 h-8 text-white/10 mx-auto mb-2" />
-                  <p className="text-sm text-white/20">No notifications yet</p>
+                  <Bell className="w-8 h-8 text-white/30 mx-auto mb-2" />
+                  <p className="text-sm text-white/50">No notifications yet</p>
                 </div>
               ) : (
                 notifications.map((notification) => (
@@ -195,8 +193,8 @@ const NotificationBell = () => {
                     <div className="flex gap-3">
                       <div className="flex-shrink-0 mt-0.5">{getIcon(notification.type)}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white/70 leading-relaxed">{notification.message}</p>
-                        <p className="text-[11px] text-white/20 mt-1">
+                        <p className="text-sm text-white leading-relaxed">{notification.message}</p>
+                        <p className="text-[11px] text-white/50 mt-1">
                           {new Date(notification.createdAt).toLocaleDateString()}
                         </p>
                       </div>

@@ -73,19 +73,19 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
               {canDelete && (
                 <button
                   onClick={handleDelete}
-                  className="text-white/30 hover:text-red-400 transition-colors ml-2"
+                  className="text-white hover:text-red-400 transition-colors ml-2"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
               )}
             </div>
-            <p className="text-white/70 text-sm break-words">{comment.content}</p>
+            <p className="text-white text-sm break-words">{comment.content}</p>
           </div>
           <div className="flex items-center gap-3 mt-1 ml-1 flex-wrap">
             {isAuthenticated && (
               <button
                 onClick={() => setReplying(!replying)}
-                className="text-xs text-white/40 hover:text-emerald-300 transition-colors flex items-center gap-1"
+                className="text-xs text-white hover:text-emerald-300 transition-colors flex items-center gap-1"
               >
                 <CornerDownRight className="w-3 h-3" />
                 Reply
@@ -94,7 +94,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
             {comment.replies && comment.replies.length > 0 && (
               <button
                 onClick={() => setShowReplies(!showReplies)}
-                className="text-xs text-white/40 hover:text-emerald-300 transition-colors"
+                className="text-xs text-white hover:text-emerald-300 transition-colors"
               >
                 {showReplies ? 'Hide' : 'Show'} {comment.replies.length} replies
               </button>
@@ -116,7 +116,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
               <input
                 type="text"
                 placeholder="Write a reply..."
-                className="input-glass flex-grow text-sm py-2 px-3"
+                className="input-glass flex-grow text-sm py-2 px-3 text-white placeholder-white/50"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 autoFocus
@@ -214,11 +214,12 @@ const CommentSection = ({ postId, postAuthorId }) => {
     <div className="mt-8 pt-8 border-t border-white/10">
       <div className="flex items-center gap-2 mb-6">
         <MessageCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-        <h3 className="text-lg font-semibold">
-          Comments <span className="text-white/40 text-sm">({comments.length})</span>
+        <h3 className="text-lg font-semibold text-white">
+          Comments <span className="text-white text-sm">({comments.length})</span>
         </h3>
       </div>
 
+      {/* Add Comment */}
       {isAuthenticated ? (
         <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
           <Link to={`/user/${user ? user.id : ''}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
@@ -234,7 +235,7 @@ const CommentSection = ({ postId, postAuthorId }) => {
             <input
               type="text"
               placeholder="Add a comment..."
-              className="input-glass flex-grow min-w-0"
+              className="input-glass flex-grow min-w-0 text-white placeholder-white/50"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
             />
@@ -248,11 +249,12 @@ const CommentSection = ({ postId, postAuthorId }) => {
           </div>
         </form>
       ) : (
-        <div className="glass p-4 text-center mb-6 text-white/50 text-sm">
+        <div className="glass p-4 text-center mb-6 text-white text-sm">
           Please <Link to="/login" className="text-emerald-400 hover:underline">login</Link> to comment
         </div>
       )}
 
+      {/* Comments List */}
       <div className="space-y-4">
         {comments.map((comment) => (
           <CommentItem

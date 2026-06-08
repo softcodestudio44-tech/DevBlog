@@ -9,14 +9,14 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import CreatePost from './pages/CreatePost';
-import EditPost from './pages/EditPost';  // NEW: Edit post page
+import EditPost from './pages/EditPost';
 import PostDetail from './pages/PostDetail';
 import UserProfile from './pages/UserProfile';
 import EditProfile from './pages/EditProfile';
 import Chat from './pages/Chat';
 import BettyAI from './pages/BettyAI';
 
-const NO_FOOTER_PAGES = ['/chat', '/betty-ai'];
+const NO_FOOTER_PAGES = ['/chat', '/betty-ai', '/dm'];
 
 function AppContent() {
   const location = useLocation();
@@ -36,11 +36,12 @@ function AppContent() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/create" element={<CreatePost />} />
-            <Route path="/edit-post/:id" element={<EditPost />} />  {/* NEW */}
+            <Route path="/edit-post/:id" element={<EditPost />} />
             <Route path="/post/:id" element={<PostDetail />} />
             <Route path="/user/:id" element={<UserProfile />} />
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/dm" element={<Chat />} />
             <Route path="/betty-ai" element={<BettyAI />} />
           </Routes>
           {showFooter && <Footer />}

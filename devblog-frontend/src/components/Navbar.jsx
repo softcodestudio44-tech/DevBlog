@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  PenLine, LogOut, Home, MessageSquare, Sparkles, 
-  Menu, X, User, Shield
+  PenLine, LogOut, Home, MessageSquare, MessageCircle, Sparkles, 
+  Menu, X, User, Shield, Mail
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -21,12 +22,10 @@ const Navbar = () => {
     if (!socket) return;
 
     const handleFollowUpdate = (data) => {
-      // Refresh page data when follow/unfollow happens
       window.dispatchEvent(new CustomEvent('follow-update', { detail: data }));
     };
 
     const handleNewNotification = (data) => {
-      // Refresh notifications when new one arrives
       window.dispatchEvent(new CustomEvent('new-notification', { detail: data }));
     };
 
@@ -48,6 +47,7 @@ const Navbar = () => {
   const navItems = [
     { to: '/', icon: Home, label: 'Feed' },
     { to: '/chat', icon: MessageSquare, label: 'Chat' },
+    { to: '/dm', icon: Mail, label: 'DMs' },
     { to: '/betty-ai', icon: Sparkles, label: 'Betty AI' },
   ];
 
@@ -64,7 +64,7 @@ const Navbar = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white/60 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white transition-colors"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -83,11 +83,11 @@ const Navbar = () => {
                 <span className="text-white font-bold text-xs">DB</span>
               </div>
               <div className="hidden sm:block">
-                <span className="text-base font-bold gradient-text">DevBlog</span>
+                <span className="text-base font-bold text-emerald-400">DevBlog</span>
                 {isAdmin && (
                   <div className="flex items-center gap-1">
                     <Shield className="w-2.5 h-2.5 text-emerald-400" />
-                    <span className="text-[9px] text-emerald-400/60 uppercase tracking-wider">Admin</span>
+                    <span className="text-[9px] text-emerald-400 uppercase tracking-wider">Admin</span>
                   </div>
                 )}
               </div>
@@ -103,7 +103,7 @@ const Navbar = () => {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
                   isActive(item.to)
                     ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                    : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
+                    : 'text-white hover:text-emerald-300 hover:bg-white/[0.02]'
                 }`}
               >
                 <item.icon className="w-4 h-4" />
@@ -116,7 +116,7 @@ const Navbar = () => {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
                   isActive('/create')
                     ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                    : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
+                    : 'text-white hover:text-emerald-300 hover:bg-white/[0.02]'
                 }`}
               >
                 <PenLine className="w-4 h-4" />
@@ -147,7 +147,7 @@ const Navbar = () => {
 
                 <button
                   onClick={handleLogout}
-                  className="hidden sm:flex p-2 rounded-xl hover:bg-white/[0.03] text-white/40 hover:text-red-400/80 transition-all ml-1"
+                  className="hidden sm:flex p-2 rounded-xl hover:bg-white/[0.03] text-white hover:text-red-400 transition-all ml-1"
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />
@@ -155,10 +155,10 @@ const Navbar = () => {
               </>
             ) : (
               <div className="flex items-center gap-2">
-                <Link to="/login" className="px-3 py-2 rounded-xl text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.02] transition-all">
+                <Link to="/login" className="px-3 py-2 rounded-xl text-sm text-white hover:text-emerald-300 hover:bg-white/[0.02] transition-all">
                   Login
                 </Link>
-                <Link to="/register" className="px-3 py-2 rounded-xl text-sm bg-emerald-500/[0.06] border border-emerald-500/15 text-emerald-300/80 hover:bg-emerald-500/[0.1] transition-all">
+                <Link to="/register" className="px-3 py-2 rounded-xl text-sm bg-emerald-500/[0.06] border border-emerald-500/15 text-emerald-300 hover:bg-emerald-500/[0.1] transition-all">
                   Join
                 </Link>
               </div>
@@ -202,18 +202,18 @@ const Navbar = () => {
                     <span className="text-white font-bold text-sm">DB</span>
                   </div>
                   <div>
-                    <span className="text-lg font-bold gradient-text">DevBlog</span>
+                    <span className="text-lg font-bold text-emerald-400">DevBlog</span>
                     {isAdmin && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <Shield className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[10px] text-emerald-400/60 uppercase">Admin</span>
+                        <span className="text-[10px] text-emerald-400 uppercase">Admin</span>
                       </div>
                     )}
                   </div>
                 </Link>
                 <button 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 rounded-lg hover:bg-white/5 text-white/40"
+                  className="p-2 rounded-lg hover:bg-white/5 text-white"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -221,7 +221,7 @@ const Navbar = () => {
 
               {/* Mobile Nav Items */}
               <div className="flex-1 p-4 space-y-1 overflow-y-auto">
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-3">Navigation</p>
+                <p className="text-[10px] font-semibold text-white uppercase tracking-wider px-3 mb-3">Navigation</p>
 
                 {navItems.map((item) => (
                   <Link
@@ -231,7 +231,7 @@ const Navbar = () => {
                     className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
                       isActive(item.to)
                         ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                        : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
+                        : 'text-white hover:text-emerald-300 hover:bg-white/[0.02]'
                     }`}
                   >
                     <item.icon className="w-5 h-5" />
@@ -246,7 +246,7 @@ const Navbar = () => {
                     className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all mt-2 ${
                       isActive('/create')
                         ? 'bg-emerald-500/[0.08] text-emerald-300 border border-emerald-500/15'
-                        : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02]'
+                        : 'text-white hover:text-emerald-300 hover:bg-white/[0.02]'
                     }`}
                   >
                     <PenLine className="w-5 h-5" />
@@ -256,21 +256,21 @@ const Navbar = () => {
 
                 <div className="border-t border-white/[0.04] my-4" />
 
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-3">Account</p>
+                <p className="text-[10px] font-semibold text-white uppercase tracking-wider px-3 mb-3">Account</p>
 
                 {isAuthenticated ? (
                   <>
                     <Link
                       to={`/user/${user?.id}`}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-white/50 hover:text-white/80 hover:bg-white/[0.02] transition-all"
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-white hover:text-emerald-300 hover:bg-white/[0.02] transition-all"
                     >
                       <User className="w-5 h-5" />
                       <span className="text-sm font-medium">Profile</span>
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-red-400/60 hover:text-red-400 hover:bg-white/[0.02] transition-all text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-white/[0.02] transition-all text-left"
                     >
                       <LogOut className="w-5 h-5" />
                       <span className="text-sm font-medium">Logout</span>
@@ -281,7 +281,7 @@ const Navbar = () => {
                     <Link 
                       to="/login" 
                       onClick={() => setMobileMenuOpen(false)}
-                      className="block text-center py-3 rounded-xl text-white/60 border border-white/[0.05]"
+                      className="block text-center py-3 rounded-xl text-white border border-white/[0.05]"
                     >
                       Login
                     </Link>

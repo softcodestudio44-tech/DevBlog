@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
@@ -14,6 +13,10 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setCount(initialCount);
+  }, [initialCount]);
+
+  useEffect(() => {
     fetchLikeStatus();
   }, [postId]);
 
@@ -22,7 +25,8 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
     if (!socket || !postId) return;
 
     const handlePostLiked = (data) => {
-      if (data.postId === postId) {
+      if (data.postId === postId && data.userId !== 'me') {
+        // Only update count from socket if it's NOT our own action
         setCount((prev) =>
           data.action === 'like' ? prev + 1 : Math.max(0, prev - 1)
         );
@@ -43,7 +47,10 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
     }
   };
 
-  const handleLike = async () => {
+  const handleLike = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     if (!isAuthenticated) {
       alert('Please login to like posts');
       return;
@@ -51,12 +58,23 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
     if (loading) return;
 
     setLoading(true);
+
+    // Optimistic update
+    const newLiked = !liked;
+    const newCount = newLiked ? count + 1 : Math.max(0, count - 1);
+    setLiked(newLiked);
+    setCount(newCount);
+
     try {
       const response = await api.post(`/likes/${postId}`);
+      // Sync with server response
       setLiked(response.data.liked);
-      setCount((prev) => (response.data.liked ? prev + 1 : prev - 1));
+      setCount(response.data.count);
     } catch (error) {
       console.error('Error toggling like:', error);
+      // Revert on error
+      setLiked(!newLiked);
+      setCount(count);
     } finally {
       setLoading(false);
     }
@@ -69,7 +87,7 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
       className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${
         liked
           ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
-          : 'bg-white/5 text-white/50 border border-white/10 hover:bg-pink-500/10 hover:text-pink-300'
+          : 'bg-white/5 text-white border border-white/10 hover:bg-pink-500/10 hover:text-pink-300'
       }`}
     >
       <Heart className={`w-4 h-4 ${liked ? 'fill-pink-400' : ''}`} />
