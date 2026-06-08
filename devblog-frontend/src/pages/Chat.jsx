@@ -6,7 +6,7 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 
-const Chat = () => {
+const Chat = ({ defaultTab = 'channels' }) => {
   const { user, isAuthenticated } = useAuth();
   const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping } = useSocket();
   const [rooms, setRooms] = useState([]);
@@ -15,7 +15,7 @@ const Chat = () => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [activeTab, setActiveTab] = useState('channels');
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [dmUser, setDmUser] = useState(null);
   const [dmHistory, setDmHistory] = useState([]);
   const messagesContainerRef = useRef(null);
@@ -38,9 +38,7 @@ const Chat = () => {
       });
 
       socket.on('new-dm', (message) => {
-        // Refresh DM history to show new conversation
         fetchDMHistory();
-
         if (dmUser && (message.authorId === dmUser.id || message.authorId === user?.id)) {
           setMessages((prev) => {
             const exists = prev.find(m => m.id === message.id);
@@ -72,7 +70,7 @@ const Chat = () => {
     try {
       const response = await api.get('/chat/rooms');
       setRooms(response.data);
-      if (response.data.length > 0) {
+      if (response.data.length > 0 && defaultTab === 'channels') {
         selectRoom(response.data[0]);
       }
     } catch (error) {
@@ -134,7 +132,6 @@ const Chat = () => {
         recipientId: dmUser.id,
         content: newMessage.trim(),
       });
-
       setNewMessage('');
       return;
     }
@@ -190,7 +187,7 @@ const Chat = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-[#0a0f0d]">
-        <div className="w-10 h-10 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin" />
+        <div className="w-10 h-10 rounded-full border-2 border-lime-500/20 border-t-lime-400 animate-spin" />
       </div>
     );
   }
@@ -198,7 +195,7 @@ const Chat = () => {
   return (
     <div className="flex h-[calc(100vh-64px)] bg-[#0a0f0d] overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/[0.02] rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-lime-500/[0.02] rounded-full blur-3xl" />
       </div>
 
       {showSidebar && (
@@ -210,19 +207,19 @@ const Chat = () => {
 
       <div className={`
         fixed lg:static z-50 h-full w-80 lg:w-72 bg-[#0d1210]/95 backdrop-blur-xl 
-        border-r border-emerald-500/10 flex flex-col flex-shrink-0
+        border-r border-lime-500/10 flex flex-col flex-shrink-0
         transition-transform duration-300 ease-in-out
         ${showSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
 
-        <div className="p-4 border-b border-emerald-500/10 flex items-center justify-between flex-shrink-0">
+        <div className="p-4 border-b border-lime-500/10 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-lime-500 to-lime-700 flex items-center justify-center shadow-lg shadow-lime-500/20">
               <MessageCircle className="w-4 h-4 text-white" />
             </div>
             <div>
               <h2 className="font-bold text-white text-sm">DevChat</h2>
-              <p className="text-xs text-emerald-400/50">{onlineUsers.length} online</p>
+              <p className="text-xs text-lime-400/50">{onlineUsers.length} online</p>
             </div>
           </div>
           <button 
@@ -233,12 +230,12 @@ const Chat = () => {
           </button>
         </div>
 
-        <div className="flex border-b border-emerald-500/10">
+        <div className="flex border-b border-lime-500/10">
           <button
             onClick={() => setActiveTab('channels')}
             className={`flex-1 py-3 text-xs font-medium transition-all ${
               activeTab === 'channels' 
-                ? 'text-emerald-400 border-b-2 border-emerald-500/30' 
+                ? 'text-lime-400 border-b-2 border-lime-500/30' 
                 : 'text-white/30 hover:text-white/50'
             }`}
           >
@@ -248,7 +245,7 @@ const Chat = () => {
             onClick={() => setActiveTab('dms')}
             className={`flex-1 py-3 text-xs font-medium transition-all ${
               activeTab === 'dms' 
-                ? 'text-emerald-400 border-b-2 border-emerald-500/30' 
+                ? 'text-lime-400 border-b-2 border-lime-500/30' 
                 : 'text-white/30 hover:text-white/50'
             }`}
           >
@@ -266,18 +263,18 @@ const Chat = () => {
                   onClick={() => selectRoom(room)}
                   className={`w-full text-left p-3 rounded-xl transition-all ${
                     activeRoom?.id === room.id && !dmUser
-                      ? 'bg-emerald-500/10 border border-emerald-500/20'
+                      ? 'bg-lime-500/10 border border-lime-500/20'
                       : 'hover:bg-white/[0.02] border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      activeRoom?.id === room.id && !dmUser ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/5 text-white/20'
+                      activeRoom?.id === room.id && !dmUser ? 'bg-lime-500/15 text-lime-400' : 'bg-white/5 text-white/20'
                     }`}>
                       <Hash className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <span className={`text-sm font-medium block truncate ${activeRoom?.id === room.id && !dmUser ? 'text-emerald-300' : 'text-white/60'}`}>
+                      <span className={`text-sm font-medium block truncate ${activeRoom?.id === room.id && !dmUser ? 'text-lime-300' : 'text-white/60'}`}>
                         {room.name}
                       </span>
                       {room.topic && <span className="text-[11px] text-white/20 truncate block">{room.topic}</span>}
@@ -290,7 +287,6 @@ const Chat = () => {
             <div className="p-3 space-y-1">
               <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-3 mb-2">Conversations</p>
 
-              {/* DM History from API */}
               {dmHistory.map((u) => {
                 const online = isUserOnline(u.id);
                 return (
@@ -299,7 +295,7 @@ const Chat = () => {
                     onClick={() => startDM(u)}
                     className={`w-full text-left p-3 rounded-xl transition-all ${
                       dmUser?.id === u.id
-                        ? 'bg-emerald-500/10 border border-emerald-500/20'
+                        ? 'bg-lime-500/10 border border-lime-500/20'
                         : 'hover:bg-white/[0.02] border border-transparent'
                     }`}
                   >
@@ -307,15 +303,15 @@ const Chat = () => {
                       <div className="relative flex-shrink-0">
                         <Link to={`/user/${u.id}`} onClick={(e) => e.stopPropagation()}>
                           {u.avatar ? (
-                            <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15 hover:ring-emerald-400 transition-all" />
+                            <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-lime-500/15 hover:ring-lime-400 transition-all" />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-emerald-600 hover:to-teal-700 transition-all">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-lime-600 hover:to-teal-700 transition-all">
                               {u.name?.[0]}
                             </div>
                           )}
                         </Link>
                         {online ? (
-                          <Circle className="w-2 h-2 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
+                          <Circle className="w-2 h-2 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
                         ) : (
                           <Circle className="w-2 h-2 text-white/20 absolute -bottom-0.5 -right-0.5 fill-white/20 stroke-[3]" />
                         )}
@@ -325,19 +321,19 @@ const Chat = () => {
                           <Link 
                             to={`/user/${u.id}`} 
                             onClick={(e) => e.stopPropagation()}
-                            className={`text-sm font-medium block truncate hover:text-emerald-300 transition-colors ${dmUser?.id === u.id ? 'text-emerald-300' : 'text-white/60'}`}
+                            className={`text-sm font-medium block truncate hover:text-lime-300 transition-colors ${dmUser?.id === u.id ? 'text-lime-300' : 'text-white/60'}`}
                           >
                             {u.name}
                           </Link>
                         </div>
-                        <span className={`text-[11px] truncate block ${online ? 'text-emerald-400/50' : 'text-white/20'}`}>
+                        <span className={`text-[11px] truncate block ${online ? 'text-lime-400/50' : 'text-white/20'}`}>
                           {online ? 'Online' : u.lastMessage ? u.lastMessage.substring(0, 20) + (u.lastMessage.length > 20 ? '...' : '') : 'Offline'}
                         </span>
                       </div>
                       <Link 
                         to={`/user/${u.id}`} 
                         onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-emerald-400 transition-all flex-shrink-0"
+                        className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-lime-400 transition-all flex-shrink-0"
                         title="View profile"
                       >
                         <Users className="w-3.5 h-3.5" />
@@ -347,14 +343,13 @@ const Chat = () => {
                 );
               })}
 
-              {/* Online users not yet in DM history */}
               {onlineUsers.filter(u => u.id !== user?.id && !dmHistory.find(d => d.id === u.id)).map((u) => (
                 <button
                   key={u.id}
                   onClick={() => startDM(u)}
                   className={`w-full text-left p-3 rounded-xl transition-all ${
                     dmUser?.id === u.id
-                      ? 'bg-emerald-500/10 border border-emerald-500/20'
+                      ? 'bg-lime-500/10 border border-lime-500/20'
                       : 'hover:bg-white/[0.02] border border-transparent'
                   }`}
                 >
@@ -362,29 +357,29 @@ const Chat = () => {
                     <div className="relative flex-shrink-0">
                       <Link to={`/user/${u.id}`} onClick={(e) => e.stopPropagation()}>
                         {u.avatar ? (
-                          <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15 hover:ring-emerald-400 transition-all" />
+                          <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-lime-500/15 hover:ring-lime-400 transition-all" />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-emerald-600 hover:to-teal-700 transition-all">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white hover:from-lime-600 hover:to-teal-700 transition-all">
                             {u.name?.[0]}
                           </div>
                         )}
                       </Link>
-                      <Circle className="w-2 h-2 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
+                      <Circle className="w-2 h-2 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <Link 
                         to={`/user/${u.id}`} 
                         onClick={(e) => e.stopPropagation()}
-                        className={`text-sm font-medium block truncate hover:text-emerald-300 transition-colors ${dmUser?.id === u.id ? 'text-emerald-300' : 'text-white/60'}`}
+                        className={`text-sm font-medium block truncate hover:text-lime-300 transition-colors ${dmUser?.id === u.id ? 'text-lime-300' : 'text-white/60'}`}
                       >
                         {u.name}
                       </Link>
-                      <span className="text-[11px] text-emerald-400/50 truncate block">Online</span>
+                      <span className="text-[11px] text-lime-400/50 truncate block">Online</span>
                     </div>
                     <Link 
                       to={`/user/${u.id}`} 
                       onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-emerald-400 transition-all flex-shrink-0"
+                      className="p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-lime-400 transition-all flex-shrink-0"
                       title="View profile"
                     >
                       <Users className="w-3.5 h-3.5" />
@@ -400,7 +395,7 @@ const Chat = () => {
           )}
         </div>
 
-        <div className="p-4 border-t border-emerald-500/10 flex-shrink-0">
+        <div className="p-4 border-t border-lime-500/10 flex-shrink-0">
           <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider mb-3">Online Now</p>
           <div className="flex -space-x-2">
             {onlineUsers.filter(u => u.id !== user?.id).slice(0, 5).map((u) => (
@@ -413,7 +408,7 @@ const Chat = () => {
                 {u.avatar ? (
                   <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-900" />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-slate-900">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-slate-900">
                     {u.name?.[0]}
                   </div>
                 )}
@@ -431,7 +426,7 @@ const Chat = () => {
       <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full overflow-hidden">
 
         {activeRoom && !dmUser && (
-          <div className="px-4 py-3 border-b border-emerald-500/10 flex items-center gap-3 flex-shrink-0">
+          <div className="px-4 py-3 border-b border-lime-500/10 flex items-center gap-3 flex-shrink-0">
             <button 
               onClick={() => setShowSidebar(true)} 
               className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white/30"
@@ -439,8 +434,8 @@ const Chat = () => {
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <Hash className="w-4 h-4 text-emerald-400" />
+            <div className="w-9 h-9 rounded-xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center">
+              <Hash className="w-4 h-4 text-lime-400" />
             </div>
 
             <div className="min-w-0">
@@ -449,9 +444,9 @@ const Chat = () => {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/5 border border-emerald-500/10">
-                <Users className="w-3.5 h-3.5 text-emerald-400/60" />
-                <span className="text-xs text-emerald-400/60">{onlineUsers.length}</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-500/5 border border-lime-500/10">
+                <Users className="w-3.5 h-3.5 text-lime-400/60" />
+                <span className="text-xs text-lime-400/60">{onlineUsers.length}</span>
               </div>
 
               {isAdmin && (
@@ -468,7 +463,7 @@ const Chat = () => {
         )}
 
         {dmUser && (
-          <div className="px-4 py-3 border-b border-emerald-500/10 flex items-center gap-3 flex-shrink-0">
+          <div className="px-4 py-3 border-b border-lime-500/10 flex items-center gap-3 flex-shrink-0">
             <button 
               onClick={() => setShowSidebar(true)} 
               className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white/30"
@@ -485,23 +480,23 @@ const Chat = () => {
 
             <Link to={`/user/${dmUser.id}`} className="relative hover:opacity-80 transition-opacity">
               {dmUser.avatar ? (
-                <img src={dmUser.avatar} alt={dmUser.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-emerald-500/20" />
+                <img src={dmUser.avatar} alt={dmUser.name} className="w-9 h-9 rounded-full object-cover ring-2 ring-lime-500/20" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-sm font-bold text-white">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-sm font-bold text-white">
                   {dmUser.name?.[0]}
                 </div>
               )}
               {isUserOnline(dmUser.id) ? (
-                <Circle className="w-2.5 h-2.5 text-emerald-400 absolute -bottom-0.5 -right-0.5 fill-emerald-400 stroke-[3]" />
+                <Circle className="w-2.5 h-2.5 text-lime-400 absolute -bottom-0.5 -right-0.5 fill-lime-400 stroke-[3]" />
               ) : (
                 <Circle className="w-2.5 h-2.5 text-white/20 absolute -bottom-0.5 -right-0.5 fill-white/20 stroke-[3]" />
               )}
             </Link>
             <div className="min-w-0">
-              <Link to={`/user/${dmUser.id}`} className="font-semibold text-white text-sm hover:text-emerald-300 transition-colors">
+              <Link to={`/user/${dmUser.id}`} className="font-semibold text-white text-sm hover:text-lime-300 transition-colors">
                 {dmUser.name}
               </Link>
-              <p className="text-xs text-emerald-400/50">
+              <p className="text-xs text-lime-400/50">
                 {isUserOnline(dmUser.id) ? 'Online' : 'Offline'}
               </p>
             </div>
@@ -515,11 +510,11 @@ const Chat = () => {
         >
           {messages.length === 0 && dmUser ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-center mb-4">
-                <MessageCircle className="w-7 h-7 text-emerald-400/30" />
+              <div className="w-16 h-16 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
+                <MessageCircle className="w-7 h-7 text-lime-400/30" />
               </div>
               <p className="text-sm text-white/30">Start a conversation with {dmUser.name}</p>
-              <Link to={`/user/${dmUser.id}`} className="text-xs text-emerald-400/50 hover:text-emerald-300 mt-2 transition-colors">
+              <Link to={`/user/${dmUser.id}`} className="text-xs text-lime-400/50 hover:text-lime-300 mt-2 transition-colors">
                 View profile →
               </Link>
             </div>
@@ -531,17 +526,16 @@ const Chat = () => {
               return (
                 <div key={msg.id} className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   <div className={`flex gap-2 max-w-[80%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                    {/* Avatar - clickable to profile */}
                     {showAvatar && !isOwn && (
                       <Link to={`/user/${msg.authorId}`} className="flex-shrink-0 self-end hover:opacity-80 transition-opacity">
                         {msg.author?.avatar ? (
                           <img 
                             src={msg.author.avatar} 
                             alt={msg.author.name} 
-                            className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/15" 
+                            className="w-8 h-8 rounded-full object-cover ring-2 ring-lime-500/15" 
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
                             {msg.author?.name?.[0] || 'U'}
                           </div>
                         )}
@@ -549,25 +543,22 @@ const Chat = () => {
                     )}
                     {isOwn && <div className="w-8 flex-shrink-0" />}
 
-                    {/* Message Content */}
                     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                      {/* Name and time - clickable */}
                       {showAvatar && (
                         <div className={`flex items-center gap-2 mb-1 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
                           {!isOwn && (
-                            <Link to={`/user/${msg.authorId}`} className="text-xs font-medium text-white/50 hover:text-emerald-300 transition-colors">
+                            <Link to={`/user/${msg.authorId}`} className="text-xs font-medium text-white/50 hover:text-lime-300 transition-colors">
                               {msg.author?.name}
                             </Link>
                           )}
                           <span className="text-xs text-white/20">{formatTime(msg.createdAt)}</span>
-                          {isOwn && <span className="text-xs font-medium text-emerald-400/50">You</span>}
+                          {isOwn && <span className="text-xs font-medium text-lime-400/50">You</span>}
                         </div>
                       )}
 
-                      {/* Message Bubble */}
                       <div className={`px-4 py-2.5 rounded-2xl ${
                         isOwn 
-                          ? 'bg-emerald-600/20 border border-emerald-500/25 rounded-tr-sm text-white/90' 
+                          ? 'bg-lime-600/20 border border-lime-500/25 rounded-tr-sm text-white/90' 
                           : 'bg-white/[0.03] border border-white/[0.06] rounded-tl-sm text-white/75'
                       }`}>
                         <p className="text-sm break-words leading-relaxed">{msg.content}</p>
@@ -583,7 +574,7 @@ const Chat = () => {
             <div className="flex w-full justify-start">
               <div className="flex gap-2 max-w-[80%]">
                 <div className="flex-shrink-0 self-end">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center">
                     <Users className="w-4 h-4 text-white" />
                   </div>
                 </div>
@@ -600,7 +591,7 @@ const Chat = () => {
         </div>
 
         {isAuthenticated ? (
-          <div className="px-4 py-4 border-t border-emerald-500/10 flex-shrink-0">
+          <div className="px-4 py-4 border-t border-lime-500/10 flex-shrink-0">
             <form onSubmit={handleSend} className="flex items-end gap-3 max-w-4xl mx-auto">
               <div className="flex-1 relative">
                 <input
@@ -618,15 +609,15 @@ const Chat = () => {
               <button
                 type="submit"
                 disabled={!newMessage.trim()}
-                className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-20 shadow-lg shadow-emerald-500/20"
+                className="w-11 h-11 rounded-xl bg-gradient-to-br from-lime-500 to-lime-600 flex items-center justify-center hover:from-lime-400 hover:to-lime-500 transition-all disabled:opacity-20 shadow-lg shadow-lime-500/20"
               >
                 <Send className="w-5 h-5 text-white" />
               </button>
             </form>
           </div>
         ) : (
-          <div className="p-4 border-t border-emerald-500/10 text-center text-white/20 text-sm">
-            Please <a href="/login" className="text-emerald-400 hover:underline">login</a> to join the chat
+          <div className="p-4 border-t border-lime-500/10 text-center text-white/20 text-sm">
+            Please <a href="/login" className="text-lime-400 hover:underline">login</a> to join the chat
           </div>
         )}
       </div>

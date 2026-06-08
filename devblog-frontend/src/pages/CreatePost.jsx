@@ -105,7 +105,6 @@ const CreatePost = () => {
       <SEO title="Write Post — DevBlog" description="Create a new blog post" />
       <div className="min-h-screen pt-24 pb-12 px-4" style={{ background: '#050608' }}>
         <div className="max-w-3xl mx-auto">
-          {/* Mobile-friendly header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
             <h1 className="text-2xl font-bold text-white">Write Post</h1>
             <div className="flex gap-2 flex-wrap">
@@ -118,7 +117,7 @@ const CreatePost = () => {
               <button
                 onClick={handlePublish}
                 disabled={loading || !title.trim() || !content.trim()}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-30 shadow-lg shadow-emerald-500/15"
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm bg-gradient-to-br from-lime-500 to-lime-600 text-white hover:from-lime-400 hover:to-lime-500 transition-all disabled:opacity-30 shadow-lg shadow-lime-500/15"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Publish
@@ -130,7 +129,7 @@ const CreatePost = () => {
             <input
               type="text"
               placeholder="Post title..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-lime-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -138,12 +137,11 @@ const CreatePost = () => {
             <input
               type="text"
               placeholder="Tags (comma separated)..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-lime-500/50 focus:bg-white/[0.05] transition-all"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
             />
 
-            {/* Image Upload */}
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-white">Images ({images.length})</span>
@@ -185,7 +183,7 @@ const CreatePost = () => {
 
             <textarea
               placeholder="Write your post content in Markdown..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-lime-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />

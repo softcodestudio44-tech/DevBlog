@@ -16,7 +16,7 @@ import EditProfile from './pages/EditProfile';
 import Chat from './pages/Chat';
 import BettyAI from './pages/BettyAI';
 
-const NO_FOOTER_PAGES = ['/chat', '/betty-ai', '/dm'];
+const NO_FOOTER_PAGES = ['/community', '/messages', '/betty-ai'];
 
 function AppContent() {
   const location = useLocation();
@@ -40,8 +40,8 @@ function AppContent() {
             <Route path="/post/:id" element={<PostDetail />} />
             <Route path="/user/:id" element={<UserProfile />} />
             <Route path="/edit-profile" element={<EditProfile />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/dm" element={<Chat />} />
+            <Route path="/community" element={<Chat defaultTab="channels" />} />
+            <Route path="/messages" element={<Chat defaultTab="dms" />} />
             <Route path="/betty-ai" element={<BettyAI />} />
           </Routes>
           {showFooter && <Footer />}

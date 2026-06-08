@@ -13,13 +13,11 @@ const NotificationBell = () => {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Initial fetch
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchNotifications();
   }, [isAuthenticated]);
 
-  // Real-time socket listener for new notifications
   useEffect(() => {
     if (!socket || !user) return;
 
@@ -82,7 +80,7 @@ const NotificationBell = () => {
     switch (type) {
       case 'like': return <Heart className="w-4 h-4 text-red-400" />;
       case 'comment': return <MessageCircle className="w-4 h-4 text-blue-400" />;
-      case 'reply': return <MessageCircle className="w-4 h-4 text-emerald-400" />;
+      case 'reply': return <MessageCircle className="w-4 h-4 text-lime-400" />;
       case 'follow': return <UserPlus className="w-4 h-4 text-purple-400" />;
       case 'mention': return <AtSign className="w-4 h-4 text-yellow-400" />;
       default: return <Bell className="w-4 h-4 text-white" />;
@@ -107,7 +105,6 @@ const NotificationBell = () => {
 
       {open && (
         <>
-          {/* Mobile: Full screen overlay */}
           <div className="sm:hidden fixed inset-0 z-50 flex items-start justify-center pt-20 px-4">
             <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
             <div className="relative w-full max-w-sm glass-strong rounded-2xl overflow-hidden shadow-2xl max-h-[70vh] flex flex-col">
@@ -117,7 +114,7 @@ const NotificationBell = () => {
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                      className="flex items-center gap-1 text-xs text-lime-400 hover:text-lime-300 transition-colors"
                     >
                       <Check className="w-3 h-3" />
                       Mark all
@@ -140,7 +137,7 @@ const NotificationBell = () => {
                       key={notification.id}
                       onClick={() => !notification.read && markAsRead(notification.id)}
                       className={`p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
-                        !notification.read ? 'bg-emerald-500/[0.02]' : ''
+                        !notification.read ? 'bg-lime-500/[0.02]' : ''
                       }`}
                     >
                       <div className="flex gap-3">
@@ -151,7 +148,7 @@ const NotificationBell = () => {
                             {new Date(notification.createdAt).toLocaleDateString()}
                           </p>
                         </div>
-                        {!notification.read && <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 mt-1.5" />}
+                        {!notification.read && <div className="w-2 h-2 rounded-full bg-lime-400 flex-shrink-0 mt-1.5" />}
                       </div>
                     </div>
                   ))
@@ -160,7 +157,6 @@ const NotificationBell = () => {
             </div>
           </div>
 
-          {/* Desktop: Dropdown below */}
           <div className="hidden sm:block absolute right-0 top-full mt-2 w-80 glass-strong rounded-2xl overflow-hidden shadow-2xl z-50">
             <div className="absolute -top-1.5 right-3 w-3 h-3 bg-[rgba(15,18,22,0.85)] rotate-45 border-l border-t border-white/[0.06]" />
             <div className="p-4 border-b border-white/[0.04] flex items-center justify-between relative z-10">
@@ -168,7 +164,7 @@ const NotificationBell = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                  className="flex items-center gap-1 text-xs text-lime-400 hover:text-lime-300 transition-colors"
                 >
                   <Check className="w-3 h-3" />
                   Mark all read
@@ -187,7 +183,7 @@ const NotificationBell = () => {
                     key={notification.id}
                     onClick={() => !notification.read && markAsRead(notification.id)}
                     className={`p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
-                      !notification.read ? 'bg-emerald-500/[0.02]' : ''
+                      !notification.read ? 'bg-lime-500/[0.02]' : ''
                     }`}
                   >
                     <div className="flex gap-3">
@@ -198,7 +194,7 @@ const NotificationBell = () => {
                           {new Date(notification.createdAt).toLocaleDateString()}
                         </p>
                       </div>
-                      {!notification.read && <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 mt-1.5" />}
+                      {!notification.read && <div className="w-2 h-2 rounded-full bg-lime-400 flex-shrink-0 mt-1.5" />}
                     </div>
                   </div>
                 ))
