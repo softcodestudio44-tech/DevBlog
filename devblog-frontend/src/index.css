@@ -16,11 +16,11 @@
   --glass-border: rgba(255, 255, 255, 0.04);
   --glass-highlight: rgba(255, 255, 255, 0.02);
 
-  /* Muted lime – less bright, more sophisticated */
-  --lime-primary: #9cbb4a;     /* main accent */
-  --lime-soft:   #b8d46e;      /* lighter for hover/glow */
-  --lime-dark:   #6a8c2e;      /* darker for borders */
-  --lime-glow:   rgba(156, 187, 74, 0.25);
+  /* Lime green — bright but not logo-bright */
+  --lime-primary: #84cc16;
+  --lime-soft: #a3e635;
+  --lime-dark: #65a30d;
+  --lime-glow: rgba(132, 204, 22, 0.25);
 
   --text-primary: rgba(255, 255, 255, 0.92);
   --text-secondary: rgba(255, 255, 255, 0.65);
@@ -39,7 +39,7 @@ html, body {
   padding: 0;
 }
 
-/* ===== PLANETARY / CODE BACKGROUND ===== */
+/* ===== PLANETARY BACKGROUND ===== */
 .app-background {
   position: fixed;
   inset: 0;
@@ -47,39 +47,47 @@ html, body {
   background: #030405;
 }
 
-/* Deep cosmic glow */
+/* Deep cosmic glow with planets */
 .app-background::before {
   content: '';
   position: absolute;
   inset: 0;
   background: 
-    radial-gradient(ellipse 50% 40% at 30% 20%, rgba(156, 187, 74, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 35% at 80% 70%, rgba(106, 140, 46, 0.03) 0%, transparent 60%),
-    repeating-linear-gradient(45deg, rgba(255,255,255,0.01) 0px, rgba(255,255,255,0.01) 2px, transparent 2px, transparent 8px);
+    /* Planet 1 — large lime glow */
+    radial-gradient(circle 300px at 20% 30%, rgba(132, 204, 22, 0.06) 0%, transparent 70%),
+    /* Planet 2 — teal glow */
+    radial-gradient(circle 250px at 80% 70%, rgba(20, 184, 166, 0.04) 0%, transparent 70%),
+    /* Planet 3 — small bright spot */
+    radial-gradient(circle 150px at 60% 20%, rgba(163, 230, 53, 0.05) 0%, transparent 70%),
+    /* Grid pattern */
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.008) 0px, rgba(255,255,255,0.008) 1px, transparent 1px, transparent 60px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,0.005) 0px, rgba(255,255,255,0.005) 1px, transparent 1px, transparent 80px);
   pointer-events: none;
 }
 
-/* Floating code strings */
+/* Floating code strings — MORE VISIBLE */
 .code-particle {
   position: absolute;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--lime-primary);
-  opacity: 0.08;
+  opacity: 0.15;
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
-  animation: floatCode 25s linear infinite;
+  animation: floatCode 20s linear infinite;
+  text-shadow: 0 0 20px rgba(132, 204, 22, 0.3);
 }
 
 @keyframes floatCode {
-  0% { transform: translateY(100vh) translateX(-20px); opacity: 0; }
-  10% { opacity: 0.08; }
-  90% { opacity: 0.08; }
-  100% { transform: translateY(-20vh) translateX(20px); opacity: 0; }
+  0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+  5% { opacity: 0.15; }
+  95% { opacity: 0.15; }
+  100% { transform: translateY(-10vh) rotate(10deg); opacity: 0; }
 }
 
-/* Glassmorphism – more subdued */
+/* Glassmorphism */
 .glass {
   background: var(--glass-black);
   backdrop-filter: blur(24px);
@@ -98,19 +106,19 @@ html, body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-highlight);
 }
 
-/* Text effects – muted gradient */
+/* Text effects */
 .gradient-text {
-  background: linear-gradient(135deg, #d0e68c, #9cbb4a, #7aa32e);
+  background: linear-gradient(135deg, #d9f99d, #a3e635, #84cc16);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Buttons – muted lime */
+/* Buttons */
 .btn-neon {
-  background: linear-gradient(135deg, rgba(156, 187, 74, 0.12), rgba(106, 140, 46, 0.08));
-  border: 1px solid rgba(156, 187, 74, 0.2);
-  color: #d0e68c;
+  background: linear-gradient(135deg, rgba(132, 204, 22, 0.12), rgba(101, 163, 13, 0.08));
+  border: 1px solid rgba(132, 204, 22, 0.2);
+  color: #d9f99d;
   padding: 12px 32px;
   border-radius: 14px;
   font-weight: 600;
@@ -119,11 +127,11 @@ html, body {
 }
 
 .btn-neon:hover {
-  background: linear-gradient(135deg, rgba(156, 187, 74, 0.2), rgba(106, 140, 46, 0.12));
-  border-color: rgba(156, 187, 74, 0.35);
-  box-shadow: 0 0 30px rgba(156, 187, 74, 0.1);
+  background: linear-gradient(135deg, rgba(132, 204, 22, 0.2), rgba(101, 163, 13, 0.12));
+  border-color: rgba(132, 204, 22, 0.35);
+  box-shadow: 0 0 30px rgba(132, 204, 22, 0.1);
   transform: translateY(-1px);
-  color: #eaffb6;
+  color: #ecfccb;
 }
 
 /* Inputs */
@@ -140,8 +148,8 @@ html, body {
 
 .input-glass:focus {
   outline: none;
-  border-color: rgba(156, 187, 74, 0.3);
-  box-shadow: 0 0 20px rgba(156, 187, 74, 0.06);
+  border-color: rgba(132, 204, 22, 0.3);
+  box-shadow: 0 0 20px rgba(132, 204, 22, 0.06);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -151,16 +159,16 @@ html, body {
 
 /* Tags */
 .tag {
-  background: rgba(156, 187, 74, 0.06);
-  border: 1px solid rgba(156, 187, 74, 0.12);
-  color: #d0e68c;
+  background: rgba(132, 204, 22, 0.06);
+  border: 1px solid rgba(132, 204, 22, 0.12);
+  color: #d9f99d;
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
 }
 
-/* Scrollbar – subtle */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
 }
@@ -186,7 +194,7 @@ html, body {
   animation: shimmer 2s infinite;
 }
 
-/* Typing dots – muted lime */
+/* Typing dots */
 .typing-dot {
   width: 6px;
   height: 6px;
@@ -202,29 +210,43 @@ html, body {
   30% { transform: translateY(-6px); }
 }
 
-/* Glow orb for AI (Betty) – muted */
+/* Glow orb for AI (Betty) */
 .glow-orb {
   background: radial-gradient(circle at 30% 30%, var(--lime-soft), var(--lime-dark));
-  box-shadow: 0 0 30px var(--lime-glow), 0 0 60px rgba(156, 187, 74, 0.1);
+  box-shadow: 0 0 30px var(--lime-glow), 0 0 60px rgba(132, 204, 22, 0.1);
   animation: orbPulse 3s ease-in-out infinite;
 }
 @keyframes orbPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 30px var(--lime-glow), 0 0 60px rgba(156, 187, 74, 0.1); }
-  50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(156, 187, 74, 0.35), 0 0 80px rgba(156, 187, 74, 0.15); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 30px var(--lime-glow), 0 0 60px rgba(132, 204, 22, 0.1); }
+  50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(132, 204, 22, 0.35), 0 0 80px rgba(132, 204, 22, 0.15); }
 }
 
-/* Chat message bubbles – Telegram/WhatsApp style */
+/* ===== CHAT MESSAGE BUBBLES ===== */
+
+/* WhatsApp-style DM bubbles */
 .message-user {
-  background: linear-gradient(135deg, rgba(156, 187, 74, 0.12), rgba(106, 140, 46, 0.06));
-  border: 1px solid rgba(156, 187, 74, 0.15);
+  background: linear-gradient(135deg, #65a30d, #84cc16);
+  color: white;
   border-radius: 18px;
   border-top-right-radius: 4px;
+  box-shadow: 0 2px 8px rgba(132, 204, 22, 0.15);
 }
+
 .message-other {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   border-top-left-radius: 4px;
+}
+
+/* Discord-style channel messages */
+.message-channel {
+  padding: 2px 0;
+  transition: background 0.15s;
+}
+.message-channel:hover {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* Sidebar widths */
@@ -235,14 +257,6 @@ html, body {
   .sidebar-layout {
     padding-left: 0;
     padding-top: 5rem;
-  }
-}
-.sidebar-collapsed {
-  padding-left: 5rem;
-}
-@media (min-width: 1024px) {
-  .lg\:ml-64 {
-    margin-left: 16rem;
   }
 }
 

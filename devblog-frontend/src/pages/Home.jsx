@@ -28,6 +28,7 @@ const Home = () => {
     if (!socket) return;
 
     const handleNewPost = (data) => {
+      console.log('📨 New post received:', data);
       setPosts((prev) => {
         if (prev.find((p) => p.id === data.post.id)) return prev;
         return [data.post, ...prev];
@@ -47,6 +48,7 @@ const Home = () => {
     };
 
     const handlePostLiked = (data) => {
+      console.log('❤️ Post liked:', data);
       setPosts((prev) =>
         prev.map((post) => {
           if (post.id === data.postId) {
@@ -155,7 +157,7 @@ const Home = () => {
             ease: 'easeInOut',
           }}
         >
-          <Icon className="w-12 h-12 text-emerald-400" />
+          <Icon className="w-12 h-12 text-lime-400" />
         </motion.div>
       ))}
 
@@ -170,10 +172,10 @@ const Home = () => {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-6 border-emerald-500/30"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-6 border-lime-500/30"
         >
-          <Sparkles className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm text-emerald-300 font-medium">Developer Community</span>
+          <Sparkles className="w-4 h-4 text-lime-400" />
+          <span className="text-sm text-lime-300 font-medium">Developer Community</span>
         </motion.div>
 
         <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
@@ -187,22 +189,22 @@ const Home = () => {
           Your code journey starts here.
         </p>
 
-        {/* Search Bar - Fixed */}
+        {/* Search Bar */}
         <div className="max-w-lg mx-auto mb-8">
           <div className="relative">
             <input
               type="text"
               placeholder="Search posts by title, content, or tags..."
-              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 pl-12 text-white placeholder-white/50 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
+              className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 pl-12 text-white placeholder-white/50 focus:outline-none focus:border-lime-500/50 focus:bg-white/[0.05] transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchActive(true)}
               onBlur={() => setSearchActive(false)}
             />
-            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${searchActive ? 'text-emerald-400' : 'text-white/50'}`} />
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${searchActive ? 'text-lime-400' : 'text-white/50'}`} />
           </div>
           {searchQuery && (
-            <p className="text-sm text-emerald-400 mt-2">
+            <p className="text-sm text-lime-400 mt-2">
               {filteredPosts.length} result{filteredPosts.length !== 1 ? 's' : ''} found
             </p>
           )}
@@ -221,7 +223,7 @@ const Home = () => {
             <div className="w-3 h-3 rounded-full bg-green-500" />
             <span className="text-xs text-white/50 ml-2 font-mono">devblog.js</span>
           </div>
-          <pre className="font-mono text-sm text-emerald-300 overflow-x-auto">
+          <pre className="font-mono text-sm text-lime-300 overflow-x-auto">
             <code>{`const developer = {
   name: "You",
   passion: "Building things",
@@ -243,7 +245,7 @@ const Home = () => {
           </button>
           <button 
             onClick={handleExplorePosts}
-            className="px-6 py-3 rounded-xl border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+            className="px-6 py-3 rounded-xl border border-lime-500/30 text-lime-300 hover:bg-lime-500/10 transition-colors"
           >
             Explore Posts
           </button>
@@ -293,7 +295,7 @@ const Home = () => {
           </div>
         ) : filteredPosts.length === 0 ? (
           <GlassCard className="text-center py-16">
-            <Code2 className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+            <Code2 className="w-12 h-12 text-lime-400 mx-auto mb-4" />
             <p className="text-white text-lg">No posts found. Try a different search!</p>
           </GlassCard>
         ) : (
@@ -307,16 +309,16 @@ const Home = () => {
                         <img 
                           src={post.author.avatar} 
                           alt={post.author.name} 
-                          className="w-8 h-8 rounded-full object-cover border border-emerald-500/30" 
+                          className="w-8 h-8 rounded-full object-cover border border-lime-500/30" 
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
                           {post.author?.name?.[0] || 'U'}
                         </div>
                       )}
                     </Link>
                     <div>
-                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-emerald-300 transition-colors">
+                      <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-lime-300 transition-colors">
                         {post.author?.name || 'Unknown'}
                       </Link>
                       <div className="flex items-center gap-1 text-xs text-white/60">
@@ -327,13 +329,12 @@ const Home = () => {
                   </div>
 
                   <Link to={`/post/${post.id}`} className="flex-grow">
-                    <h3 className="text-xl font-semibold mb-3 text-white line-clamp-2 hover:text-emerald-300 transition-colors">
+                    <h3 className="text-xl font-semibold mb-3 text-white line-clamp-2 hover:text-lime-300 transition-colors">
                       <MarkdownRenderer content={post.title} />
                     </h3>
                     <p className="text-white text-sm mb-4 line-clamp-3">{post.content}</p>
                   </Link>
 
-                  {/* Post Images Preview */}
                   {post.images && post.images.length > 0 && (
                     <Link to={`/post/${post.id}`} className="mb-4 block">
                       <div className="rounded-lg overflow-hidden bg-white/5">
@@ -359,11 +360,10 @@ const Home = () => {
                       ))}
                     </div>
                     <div className="flex items-center gap-3">
-                      {/* Like button clickable from feed */}
                       <div onClick={(e) => e.stopPropagation()}>
                         <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
                       </div>
-                      <Link to={`/post/${post.id}`} className="flex items-center gap-1 text-white hover:text-emerald-300 transition-colors">
+                      <Link to={`/post/${post.id}`} className="flex items-center gap-1 text-white hover:text-lime-300 transition-colors">
                         <MessageCircle className="w-4 h-4" />
                         <span className="text-xs">{post.commentCount || 0}</span>
                       </Link>

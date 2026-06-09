@@ -21,8 +21,17 @@ const Navbar = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewDM = () => setMessageCount(prev => prev + 1);
-    const handleNewChannelMessage = () => setCommunityCount(prev => prev + 1);
+    const handleNewDM = () => {
+      if (location.pathname !== '/messages') {
+        setMessageCount(prev => prev + 1);
+      }
+    };
+
+    const handleNewChannelMessage = () => {
+      if (location.pathname !== '/community') {
+        setCommunityCount(prev => prev + 1);
+      }
+    };
 
     socket.on('new-dm', handleNewDM);
     socket.on('new-message', handleNewChannelMessage);
@@ -31,8 +40,9 @@ const Navbar = () => {
       socket.off('new-dm', handleNewDM);
       socket.off('new-message', handleNewChannelMessage);
     };
-  }, [socket]);
+  }, [socket, location.pathname]);
 
+  // Reset badges when visiting the page
   useEffect(() => {
     if (location.pathname === '/messages') setMessageCount(0);
     if (location.pathname === '/community') setCommunityCount(0);
@@ -105,7 +115,7 @@ const Navbar = () => {
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
                 {item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
                     {item.badge > 9 ? '9+' : item.badge}
                   </span>
                 )}
@@ -230,7 +240,7 @@ const Navbar = () => {
                     <item.icon className="w-5 h-5" />
                     <span className="text-sm font-medium">{item.label}</span>
                     {item.badge > 0 && (
-                      <span className="ml-auto w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center">
+                      <span className="ml-auto w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
                         {item.badge > 9 ? '9+' : item.badge}
                       </span>
                     )}

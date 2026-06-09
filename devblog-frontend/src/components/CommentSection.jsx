@@ -17,10 +17,14 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
     if (!replyContent.trim()) return;
 
     try {
-      await api.post(`/posts/${postId}/comments`, {
+      const response = await api.post(`/posts/${postId}/comments`, {
         content: replyContent,
         parentId: comment.id,
       });
+      const newReply = response.data?.comment;
+      if (newReply && comment.replies) {
+        comment.replies.push(newReply);
+      }
       setReplyContent('');
       setReplying(false);
       onCommentAdded();
@@ -176,11 +180,22 @@ const CommentSection = ({ postId, postAuthorId }) => {
       if (data.postId === postId) {
         if (data.comment) {
           setComments((prev) => {
+            // If it's a reply, find parent and add to replies
+            if (data.comment.parentId) {
+              return prev.map((c) => {
+                if (c.id === data.comment.parentId) {
+                  return {
+                    ...c,
+                    replies: [...(c.replies || []), data.comment],
+                  };
+                }
+                return c;
+              });
+            }
+            // Top-level comment
             if (prev.find((c) => c.id === data.comment.id)) return prev;
             return [data.comment, ...prev];
           });
-        } else {
-          fetchComments();
         }
       }
     };
@@ -204,25 +219,34 @@ const CommentSection = ({ postId, postAuthorId }) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
+    // Optimistically add comment immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticComment = {
+      id: tempId,
+      content: newComment,
+      authorId: user.id,
+      author: { id: user.id, name: user.name, avatar: user.avatar },
+      createdAt: new Date().toISOString(),
+      replies: [],
+    };
+
+    setComments((prev) => [optimisticComment, ...prev]);
+    setNewComment('');
     setLoading(true);
+
     try {
-      const response = await api.post(`/posts/${postId}/comments`, { content: newComment });
-      const newCommentData = response.data?.comment || {
-        id: Date.now().toString(),
-        content: newComment,
-        authorId: user.id,
-        author: { id: user.id, name: user.name, avatar: user.avatar },
-        createdAt: new Date().toISOString(),
-        replies: [],
-      };
-
-      setComments((prev) => {
-        if (prev.find((c) => c.id === newCommentData.id)) return prev;
-        return [newCommentData, ...prev];
-      });
-
-      setNewComment('');
+      const response = await api.post(`/posts/${postId}/comments`, { content: optimisticComment.content });
+      const realComment = response.data?.comment;
+      
+      // Replace temp comment with real one
+      if (realComment) {
+        setComments((prev) =>
+          prev.map((c) => (c.id === tempId ? { ...realComment, replies: [] } : c))
+        );
+      }
     } catch (error) {
+      // Remove temp comment on error
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
       console.error('Error adding comment:', error);
     } finally {
       setLoading(false);

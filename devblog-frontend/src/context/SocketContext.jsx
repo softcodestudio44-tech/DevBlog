@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -10,12 +10,19 @@ export const SocketProvider = ({ children }) => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState({});
   const [connected, setConnected] = useState(false);
+  const socketRef = useRef(null);
+  const joinedRoomsRef = useRef(new Set());
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    
     const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
-    
+
+    // Close existing socket before creating new one
+    if (socketRef.current) {
+      socketRef.current.close();
+      joinedRoomsRef.current.clear();
+    }
+
     const newSocket = io(SOCKET_URL, {
       auth: { token },
       transports: ['polling', 'websocket'],
@@ -27,6 +34,10 @@ export const SocketProvider = ({ children }) => {
     newSocket.on('connect', () => {
       console.log('✅ Socket connected');
       setConnected(true);
+      // Re-join all rooms after reconnect
+      joinedRoomsRef.current.forEach((roomId) => {
+        newSocket.emit('join-room', roomId);
+      });
     });
 
     newSocket.on('connect_error', (err) => {
@@ -50,27 +61,39 @@ export const SocketProvider = ({ children }) => {
       }));
     });
 
+    socketRef.current = newSocket;
     setSocket(newSocket);
 
     return () => {
       newSocket.close();
+      joinedRoomsRef.current.clear();
     };
-  }, [isAuthenticated]);
+  }, []); // NO dependency on isAuthenticated — stable connection
 
   const joinRoom = (roomId) => {
-    if (socket) socket.emit('join-room', roomId);
+    if (socketRef.current && roomId) {
+      socketRef.current.emit('join-room', roomId);
+      joinedRoomsRef.current.add(roomId);
+    }
   };
 
   const leaveRoom = (roomId) => {
-    if (socket) socket.emit('leave-room', roomId);
+    if (socketRef.current && roomId) {
+      socketRef.current.emit('leave-room', roomId);
+      joinedRoomsRef.current.delete(roomId);
+    }
   };
 
   const sendMessage = (roomId, content) => {
-    if (socket) socket.emit('send-message', { roomId, content });
+    if (socketRef.current) {
+      socketRef.current.emit('send-message', { roomId, content });
+    }
   };
 
   const setTyping = (roomId, isTyping) => {
-    if (socket) socket.emit('typing', { roomId, isTyping });
+    if (socketRef.current) {
+      socketRef.current.emit('typing', { roomId, isTyping });
+    }
   };
 
   return (

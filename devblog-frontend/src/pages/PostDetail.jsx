@@ -118,7 +118,7 @@ const PostDetail = () => {
       <div className="min-h-screen pt-24 px-4 flex items-center justify-center">
         <GlassCard className="text-center py-12">
           <p className="text-white text-lg">Post not found</p>
-          <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
+          <Link to="/" className="text-lime-400 hover:underline mt-4 inline-block">
             Back to posts
           </Link>
         </GlassCard>
@@ -141,7 +141,7 @@ const PostDetail = () => {
           >
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-white hover:text-emerald-300 transition-colors mb-6"
+              className="inline-flex items-center gap-2 text-white hover:text-lime-300 transition-colors mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to posts
@@ -156,16 +156,16 @@ const PostDetail = () => {
                       <img
                         src={post.author.avatar}
                         alt={post.author.name}
-                        className="w-10 h-10 rounded-full object-cover border border-emerald-500/30"
+                        className="w-10 h-10 rounded-full object-cover border border-lime-500/30"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-lime-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
                         {post.author?.name?.[0] || 'U'}
                       </div>
                     )}
                   </Link>
                   <div>
-                    <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-emerald-300 transition-colors">
+                    <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-lime-300 transition-colors">
                       {post.author?.name || 'Unknown'}
                     </Link>
                     <div className="flex items-center gap-1 text-xs text-white/60">
@@ -189,7 +189,7 @@ const PostDetail = () => {
                   {isAuthor && (
                     <Link
                       to={`/edit-post/${id}`}
-                      className="p-2 rounded-xl hover:bg-white/5 text-white hover:text-emerald-300 transition-colors"
+                      className="p-2 rounded-xl hover:bg-white/5 text-white hover:text-lime-300 transition-colors"
                       title="Edit post"
                     >
                       <Edit3 className="w-4 h-4" />
@@ -215,7 +215,7 @@ const PostDetail = () => {
                 </div>
               )}
 
-              {/* Images - Full display without cropping */}
+              {/* Images */}
               {post.images && post.images.length > 0 && (
                 <div className="space-y-4 mb-6">
                   {post.images.map((img, i) => (
@@ -231,7 +231,7 @@ const PostDetail = () => {
                 </div>
               )}
 
-              {/* Content - Render markdown properly */}
+              {/* Content */}
               <div className="prose prose-invert max-w-none mb-8">
                 <MarkdownRenderer content={post.content} />
               </div>
@@ -239,11 +239,11 @@ const PostDetail = () => {
               {/* Actions */}
               <div className="flex items-center gap-4 pt-6 border-t border-white/10">
                 <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
-                <button className="flex items-center gap-2 text-white hover:text-emerald-300 transition-colors">
+                <button className="flex items-center gap-2 text-white hover:text-lime-300 transition-colors">
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-sm">{post.commentCount || 0}</span>
                 </button>
-                <button className="flex items-center gap-2 text-white hover:text-emerald-300 transition-colors ml-auto">
+                <button className="flex items-center gap-2 text-white hover:text-lime-300 transition-colors ml-auto">
                   <Share2 className="w-5 h-5" />
                   <span className="text-sm">Share</span>
                 </button>
