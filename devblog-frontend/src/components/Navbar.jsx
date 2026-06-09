@@ -21,14 +21,16 @@ const Navbar = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewDM = () => {
-      if (location.pathname !== '/messages') {
+    const handleNewDM = (message) => {
+      // Only count if not from self and not on messages page
+      if (message.authorId !== user?.id && location.pathname !== '/messages') {
         setMessageCount(prev => prev + 1);
       }
     };
 
-    const handleNewChannelMessage = () => {
-      if (location.pathname !== '/community') {
+    const handleNewChannelMessage = (message) => {
+      // Only count if not from self and not on community page
+      if (message.authorId !== user?.id && location.pathname !== '/community') {
         setCommunityCount(prev => prev + 1);
       }
     };
@@ -40,7 +42,7 @@ const Navbar = () => {
       socket.off('new-dm', handleNewDM);
       socket.off('new-message', handleNewChannelMessage);
     };
-  }, [socket, location.pathname]);
+  }, [socket, location.pathname, user]);
 
   // Reset badges when visiting the page
   useEffect(() => {

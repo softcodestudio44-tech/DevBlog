@@ -16,7 +16,6 @@
   --glass-border: rgba(255, 255, 255, 0.04);
   --glass-highlight: rgba(255, 255, 255, 0.02);
 
-  /* Lime green — bright but not logo-bright */
   --lime-primary: #84cc16;
   --lime-soft: #a3e635;
   --lime-dark: #65a30d;
@@ -47,19 +46,15 @@ html, body {
   background: #030405;
 }
 
-/* Deep cosmic glow with planets */
 .app-background::before {
   content: '';
   position: absolute;
   inset: 0;
   background: 
-    /* Planet 1 — large lime glow */
-    radial-gradient(circle 300px at 20% 30%, rgba(132, 204, 22, 0.06) 0%, transparent 70%),
-    /* Planet 2 — teal glow */
-    radial-gradient(circle 250px at 80% 70%, rgba(20, 184, 166, 0.04) 0%, transparent 70%),
-    /* Planet 3 — small bright spot */
-    radial-gradient(circle 150px at 60% 20%, rgba(163, 230, 53, 0.05) 0%, transparent 70%),
-    /* Grid pattern */
+    radial-gradient(circle 400px at 20% 30%, rgba(132, 204, 22, 0.06) 0%, transparent 70%),
+    radial-gradient(circle 350px at 80% 70%, rgba(20, 184, 166, 0.04) 0%, transparent 70%),
+    radial-gradient(circle 200px at 60% 20%, rgba(163, 230, 53, 0.05) 0%, transparent 70%),
+    radial-gradient(circle 280px at 40% 80%, rgba(168, 85, 247, 0.03) 0%, transparent 70%),
     repeating-linear-gradient(45deg, rgba(255,255,255,0.008) 0px, rgba(255,255,255,0.008) 1px, transparent 1px, transparent 60px),
     repeating-linear-gradient(-45deg, rgba(255,255,255,0.005) 0px, rgba(255,255,255,0.005) 1px, transparent 1px, transparent 80px);
   pointer-events: none;
@@ -69,22 +64,22 @@ html, body {
 .code-particle {
   position: absolute;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--lime-primary);
-  opacity: 0.15;
+  opacity: 0.2;
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
   animation: floatCode 20s linear infinite;
-  text-shadow: 0 0 20px rgba(132, 204, 22, 0.3);
+  text-shadow: 0 0 30px rgba(132, 204, 22, 0.4);
 }
 
 @keyframes floatCode {
   0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
-  5% { opacity: 0.15; }
-  95% { opacity: 0.15; }
-  100% { transform: translateY(-10vh) rotate(10deg); opacity: 0; }
+  5% { opacity: 0.2; }
+  95% { opacity: 0.2; }
+  100% { transform: translateY(-10vh) rotate(15deg); opacity: 0; }
 }
 
 /* Glassmorphism */
@@ -210,7 +205,7 @@ html, body {
   30% { transform: translateY(-6px); }
 }
 
-/* Glow orb for AI (Betty) */
+/* Glow orb */
 .glow-orb {
   background: radial-gradient(circle at 30% 30%, var(--lime-soft), var(--lime-dark));
   box-shadow: 0 0 30px var(--lime-glow), 0 0 60px rgba(132, 204, 22, 0.1);
@@ -221,9 +216,7 @@ html, body {
   50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(132, 204, 22, 0.35), 0 0 80px rgba(132, 204, 22, 0.15); }
 }
 
-/* ===== CHAT MESSAGE BUBBLES ===== */
-
-/* WhatsApp-style DM bubbles */
+/* Chat bubbles */
 .message-user {
   background: linear-gradient(135deg, #65a30d, #84cc16);
   color: white;
@@ -240,27 +233,7 @@ html, body {
   border-top-left-radius: 4px;
 }
 
-/* Discord-style channel messages */
-.message-channel {
-  padding: 2px 0;
-  transition: background 0.15s;
-}
-.message-channel:hover {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-/* Sidebar widths */
-.sidebar-layout {
-  padding-left: 16rem;
-}
-@media (max-width: 1024px) {
-  .sidebar-layout {
-    padding-left: 0;
-    padding-top: 5rem;
-  }
-}
-
-/* ========== MOBILE FIXES ========== */
+/* Mobile fixes */
 html, body {
   overflow-x: hidden;
   width: 100%;

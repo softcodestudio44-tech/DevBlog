@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Heart, MessageCircle, AtSign, UserPlus, Check } from 'lucide-react';
+import { Bell, Heart, MessageCircle, AtSign, UserPlus, Check, Hash } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -29,10 +29,55 @@ const NotificationBell = () => {
       setUnreadCount((prev) => prev + 1);
     };
 
+    // Also listen for DM and channel messages as notifications
+    const handleNewDM = (message) => {
+      if (message.authorId !== user?.id) {
+        const notif = {
+          id: `dm-${message.id}`,
+          type: 'message',
+          message: `${message.author?.name || 'Someone'} sent you a message`,
+          sourceId: message.authorId,
+          sourceType: 'dm',
+          actorId: message.authorId,
+          createdAt: new Date().toISOString(),
+          read: false,
+        };
+        setNotifications((prev) => {
+          if (prev.find((n) => n.id === notif.id)) return prev;
+          return [notif, ...prev];
+        });
+        setUnreadCount((prev) => prev + 1);
+      }
+    };
+
+    const handleNewChannelMessage = (message) => {
+      if (message.authorId !== user?.id) {
+        const notif = {
+          id: `channel-${message.id}`,
+          type: 'channel',
+          message: `New message in ${message.roomName || 'Community'}`,
+          sourceId: message.roomId,
+          sourceType: 'channel',
+          actorId: message.authorId,
+          createdAt: new Date().toISOString(),
+          read: false,
+        };
+        setNotifications((prev) => {
+          if (prev.find((n) => n.id === notif.id)) return prev;
+          return [notif, ...prev];
+        });
+        setUnreadCount((prev) => prev + 1);
+      }
+    };
+
     socket.on('new-notification', handleNewNotification);
+    socket.on('new-dm', handleNewDM);
+    socket.on('new-message', handleNewChannelMessage);
 
     return () => {
       socket.off('new-notification', handleNewNotification);
+      socket.off('new-dm', handleNewDM);
+      socket.off('new-message', handleNewChannelMessage);
     };
   }, [socket, user]);
 
@@ -49,8 +94,8 @@ const NotificationBell = () => {
   const fetchNotifications = async () => {
     try {
       const response = await api.get('/notifications');
-      setNotifications(response.data.notifications);
-      setUnreadCount(response.data.unreadCount);
+      setNotifications(response.data.notifications || []);
+      setUnreadCount(response.data.unreadCount || 0);
     } catch (error) {
       console.error('Fetch notifications error:', error);
     }
@@ -83,8 +128,17 @@ const NotificationBell = () => {
       case 'reply': return <MessageCircle className="w-4 h-4 text-lime-400" />;
       case 'follow': return <UserPlus className="w-4 h-4 text-purple-400" />;
       case 'mention': return <AtSign className="w-4 h-4 text-yellow-400" />;
+      case 'message': return <MessageCircle className="w-4 h-4 text-lime-400" />;
+      case 'channel': return <Hash className="w-4 h-4 text-teal-400" />;
       default: return <Bell className="w-4 h-4 text-white" />;
     }
+  };
+
+  const getLink = (notif) => {
+    if (notif.sourceType === 'dm' || notif.type === 'message') return `/messages`;
+    if (notif.sourceType === 'channel') return `/community`;
+    if (notif.sourceType === 'post') return `/post/${notif.sourceId}`;
+    return '/';
   };
 
   if (!isAuthenticated) return null;
@@ -133,10 +187,14 @@ const NotificationBell = () => {
                   </div>
                 ) : (
                   notifications.map((notification) => (
-                    <div
+                    <Link
                       key={notification.id}
-                      onClick={() => !notification.read && markAsRead(notification.id)}
-                      className={`p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
+                      to={getLink(notification)}
+                      onClick={() => {
+                        if (!notification.read) markAsRead(notification.id);
+                        setOpen(false);
+                      }}
+                      className={`block p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
                         !notification.read ? 'bg-lime-500/[0.02]' : ''
                       }`}
                     >
@@ -150,7 +208,7 @@ const NotificationBell = () => {
                         </div>
                         {!notification.read && <div className="w-2 h-2 rounded-full bg-lime-400 flex-shrink-0 mt-1.5" />}
                       </div>
-                    </div>
+                    </Link>
                   ))
                 )}
               </div>
@@ -179,10 +237,14 @@ const NotificationBell = () => {
                 </div>
               ) : (
                 notifications.map((notification) => (
-                  <div
+                  <Link
                     key={notification.id}
-                    onClick={() => !notification.read && markAsRead(notification.id)}
-                    className={`p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
+                    to={getLink(notification)}
+                    onClick={() => {
+                      if (!notification.read) markAsRead(notification.id);
+                      setOpen(false);
+                    }}
+                    className={`block p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
                       !notification.read ? 'bg-lime-500/[0.02]' : ''
                     }`}
                   >
@@ -196,7 +258,7 @@ const NotificationBell = () => {
                       </div>
                       {!notification.read && <div className="w-2 h-2 rounded-full bg-lime-400 flex-shrink-0 mt-1.5" />}
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>

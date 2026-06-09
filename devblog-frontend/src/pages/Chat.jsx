@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageCircle, Send, Users, Hash, Menu, X, ArrowLeft, 
-  Trash2, Paperclip, Mic, CheckCheck, MoreVertical, Phone, Video
+  Trash2, Paperclip, Mic, CheckCheck, MoreVertical, Phone, Video,
+  Search, UserX
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -26,8 +27,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const processedMessagesRef = useRef(new Set());
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const isChannelTab = defaultTab === 'channels';
@@ -51,6 +54,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
     // New channel message
     const handleNewChannelMessage = (message) => {
+      // Prevent duplicates
+      if (processedMessagesRef.current.has(message.id)) return;
+      processedMessagesRef.current.add(message.id);
+      
       if (activeRoom && message.roomId === activeRoom.id) {
         setChannelMessages(prev => {
           if (prev.some(m => m.id === message.id)) return prev;
@@ -61,28 +68,36 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
     // New DM message
     const handleNewDM = (message) => {
-      // Update DM history with last message
-      setDmHistory(prev => {
-        const fromId = message.authorId === user?.id ? message.recipientId || message.authorId : message.authorId;
-        const existingIndex = prev.findIndex(u => u.id === fromId);
-        const newEntry = {
-          id: fromId,
-          name: message.author?.name,
-          avatar: message.author?.avatar,
-          lastMessage: message.content,
-          lastMessageAt: message.createdAt,
-        };
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = newEntry;
-          // Move to top
-          const [item] = updated.splice(existingIndex, 1);
-          return [item, ...updated];
-        }
-        return [newEntry, ...prev];
-      });
+      // Prevent duplicates
+      if (processedMessagesRef.current.has(message.id)) return;
+      processedMessagesRef.current.add(message.id);
 
-      // If this DM is currently open, add message to dmMessages
+      // Don't show own messages in sidebar update (already handled optimistically)
+      const isFromMe = message.authorId === user?.id;
+      
+      // Update DM history
+      if (!isFromMe) {
+        setDmHistory(prev => {
+          const fromId = message.authorId;
+          const existingIndex = prev.findIndex(u => u.id === fromId);
+          const newEntry = {
+            id: fromId,
+            name: message.author?.name,
+            avatar: message.author?.avatar,
+            lastMessage: message.content,
+            lastMessageAt: message.createdAt,
+          };
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            updated[existingIndex] = newEntry;
+            const [item] = updated.splice(existingIndex, 1);
+            return [item, ...updated];
+          }
+          return [newEntry, ...prev];
+        });
+      }
+
+      // If this DM is currently open, add message
       if (activeDMUser) {
         const isFromActiveUser = message.authorId === activeDMUser.id;
         const isToActiveUser = message.authorId === user?.id;
@@ -130,8 +145,9 @@ const Chat = ({ defaultTab = 'channels' }) => {
     if (!isAuthenticated) return;
     try {
       const res = await api.get('/chat/dm-history');
-      setDmHistory(res.data);
-      // If no DM history, show online users to start conversations
+      // Filter out self from DM history
+      const filtered = (res.data || []).filter(u => u.id !== user?.id);
+      setDmHistory(filtered);
     } catch (err) { console.error(err); }
   };
 
@@ -143,11 +159,14 @@ const Chat = ({ defaultTab = 'channels' }) => {
     joinRoom(room.id);
     try {
       const res = await api.get(`/chat/rooms/${room.id}/messages`);
-      setChannelMessages(res.data);
+      setChannelMessages(res.data || []);
+      processedMessagesRef.current.clear();
+      res.data?.forEach(m => processedMessagesRef.current.add(m.id));
     } catch (err) { console.error(err); }
   };
 
   const startDM = async (targetUser) => {
+    if (!targetUser || targetUser.id === user?.id) return; // Prevent self-DM
     if (activeRoom) leaveRoom(activeRoom.id);
     setActiveRoom(null);
     setActiveDMUser(targetUser);
@@ -157,27 +176,41 @@ const Chat = ({ defaultTab = 'channels' }) => {
     joinRoom(roomName);
     try {
       const res = await api.get(`/chat/rooms/${roomName}/messages`);
-      setDmMessages(res.data);
+      setDmMessages(res.data || []);
+      processedMessagesRef.current.clear();
+      res.data?.forEach(m => processedMessagesRef.current.add(m.id));
     } catch (err) { setDmMessages([]); }
   };
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+    
+    const content = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
     if (activeDMUser) {
+      // Prevent self-DM
+      if (activeDMUser.id === user?.id) {
+        alert("You can't message yourself!");
+        return;
+      }
+      
       socket.emit('send-dm', {
         recipientId: activeDMUser.id,
-        content: newMessage.trim(),
+        content: content,
       });
+      
       // Optimistically add to dmMessages
       const optimisticMessage = {
-        id: `temp-${Date.now()}`,
-        content: newMessage.trim(),
+        id: tempId,
+        content: content,
         authorId: user.id,
         author: { id: user.id, name: user.name, avatar: user.avatar },
         createdAt: new Date().toISOString(),
       };
       setDmMessages(prev => [...prev, optimisticMessage]);
+      
       // Update DM history
       setDmHistory(prev => {
         const existingIndex = prev.findIndex(u => u.id === activeDMUser.id);
@@ -185,7 +218,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           id: activeDMUser.id,
           name: activeDMUser.name,
           avatar: activeDMUser.avatar,
-          lastMessage: newMessage.trim(),
+          lastMessage: content,
           lastMessageAt: new Date().toISOString(),
         };
         if (existingIndex >= 0) {
@@ -196,9 +229,11 @@ const Chat = ({ defaultTab = 'channels' }) => {
         }
         return [newEntry, ...prev];
       });
+      
     } else if (activeRoom) {
-      sendMessage(activeRoom.id, newMessage.trim());
+      sendMessage(activeRoom.id, content);
     } else return;
+    
     setNewMessage('');
     if (inputRef.current) inputRef.current.focus();
   };
@@ -217,6 +252,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
     try {
       await api.delete(`/chat/rooms/${activeRoom.id}/clear`);
       setChannelMessages([]);
+      processedMessagesRef.current.clear();
     } catch (err) { console.error(err); }
   };
 
@@ -238,6 +274,9 @@ const Chat = ({ defaultTab = 'channels' }) => {
     );
   }
 
+  // Filter out self from online users
+  const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+
   // ========== COMMUNITY SIDEBAR (Channels only) ==========
   const renderCommunitySidebar = () => (
     <div className="flex flex-col h-full">
@@ -248,21 +287,24 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </div>
           <div>
             <h2 className="font-bold text-white text-sm">Community</h2>
-            <p className="text-xs text-lime-400/50">{onlineUsers.length} online</p>
+            <p className="text-xs text-lime-400/50">{otherOnlineUsers.length} online</p>
           </div>
         </div>
         <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
           <input
             type="text"
             placeholder="Search channels..."
-            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-lime-500/30"
+            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-lime-500/30"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
         <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">CHANNELS</p>
-        {rooms.map(room => (
+        {rooms.filter(r => !searchQuery || r.name.toLowerCase().includes(searchQuery.toLowerCase())).map(room => (
           <button
             key={room.id}
             onClick={() => selectRoom(room)}
@@ -294,7 +336,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
       <div className="p-4 border-t border-white/5 flex-shrink-0">
         <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-3">ONLINE NOW</p>
         <div className="flex -space-x-2">
-          {onlineUsers.filter(u => u.id !== user?.id).slice(0, 5).map(u => (
+          {otherOnlineUsers.slice(0, 5).map(u => (
             <button
               key={u.id}
               onClick={() => startDM(u)}
@@ -310,9 +352,9 @@ const Chat = ({ defaultTab = 'channels' }) => {
               )}
             </button>
           ))}
-          {onlineUsers.filter(u => u.id !== user?.id).length > 5 && (
+          {otherOnlineUsers.length > 5 && (
             <div className="w-8 h-8 rounded-full bg-white/5 border-2 border-slate-900 flex items-center justify-center text-xs text-slate-400">
-              +{onlineUsers.filter(u => u.id !== user?.id).length - 5}
+              +{otherOnlineUsers.length - 5}
             </div>
           )}
         </div>
@@ -320,9 +362,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
     </div>
   );
 
-  // ========== MESSAGES SIDEBAR (DMs only) ==========
+  // ========== MESSAGES SIDEBAR (DMs only — NO SELF) ==========
   const renderMessagesSidebar = () => {
-    const otherOnline = onlineUsers.filter(u => u.id !== user?.id && !dmHistory.find(d => d.id === u.id));
+    // Filter out self from online users for "Start new conversation"
+    const newConversations = otherOnlineUsers.filter(u => !dmHistory.find(d => d.id === u.id));
     
     return (
       <div className="flex flex-col h-full">
@@ -337,10 +380,13 @@ const Chat = ({ defaultTab = 'channels' }) => {
             </div>
           </div>
           <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
             <input
               type="text"
               placeholder="Search messages..."
-              className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-lime-500/30"
+              className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-lime-500/30"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
@@ -349,7 +395,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           {/* Conversations */}
           <div className="p-3 space-y-1">
             <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">RECENT</p>
-            {dmHistory.map(u => {
+            {dmHistory.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
               const online = isUserOnline(u.id);
               const isActive = activeDMUser?.id === u.id;
               return (
@@ -371,7 +417,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
                           </div>
                         )}
                       </div>
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0d1210] ${
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0f0d] ${
                         online ? 'bg-emerald-500' : 'bg-white/20'
                       }`} />
                     </div>
@@ -390,11 +436,11 @@ const Chat = ({ defaultTab = 'channels' }) => {
             })}
           </div>
 
-          {/* Online users to start new conversations */}
-          {otherOnline.length > 0 && (
+          {/* Start new conversations */}
+          {newConversations.length > 0 && (
             <div className="p-3 space-y-1 border-t border-white/5">
-              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">ONLINE</p>
-              {otherOnline.map(u => (
+              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">START NEW CHAT</p>
+              {newConversations.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
                 <button
                   key={u.id}
                   onClick={() => startDM(u)}
@@ -411,7 +457,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
                           </div>
                         )}
                       </div>
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0d1210] bg-emerald-500" />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0f0d] bg-emerald-500" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
@@ -423,11 +469,11 @@ const Chat = ({ defaultTab = 'channels' }) => {
             </div>
           )}
 
-          {dmHistory.length === 0 && otherOnline.length === 0 && (
+          {dmHistory.length === 0 && newConversations.length === 0 && (
             <div className="p-8 text-center">
               <MessageCircle className="w-10 h-10 text-white/20 mx-auto mb-3" />
               <p className="text-sm text-white/40">No conversations yet.</p>
-              <p className="text-xs text-white/25 mt-1">Start chatting with someone online!</p>
+              <p className="text-xs text-white/25 mt-1">No one is online right now.</p>
             </div>
           )}
         </div>
@@ -453,7 +499,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lime-500/5 border border-lime-500/10">
             <Users className="w-3.5 h-3.5 text-lime-400/60" />
-            <span className="text-xs text-lime-400/60">{onlineUsers.length}</span>
+            <span className="text-xs text-lime-400/60">{otherOnlineUsers.length}</span>
           </div>
           {isAdmin && (
             <button onClick={handleClearChat} className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" title="Clear chat">
@@ -542,7 +588,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
       {channelMessages.map((msg, idx) => {
         const prevMsg = channelMessages[idx - 1];
         const showHeader = !prevMsg || prevMsg.authorId !== msg.authorId || 
-          (new Date(msg.createdAt) - new Date(prevMsg.createdAt)) > 300000; // 5 min gap
+          (new Date(msg.createdAt) - new Date(prevMsg.createdAt)) > 300000;
         
         return (
           <div key={msg.id} className={`group ${showHeader ? 'mt-4' : 'mt-0.5'}`}>
@@ -596,7 +642,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
     </div>
   );
 
-  // ========== DM MESSAGES (WhatsApp style) ==========
+  // ========== DM MESSAGES (WhatsApp style — NO DUPLICATES) ==========
   const renderDMMessages = () => (
     <div
       ref={messagesContainerRef}
@@ -641,7 +687,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
                 <div className={`px-4 py-2 rounded-2xl ${
                   isOwn 
                     ? 'bg-lime-600 text-white rounded-tr-sm' 
-                    : 'bg-white/[0.06] text-white/90 rounded-tl-sm border border-white/[0.05]'
+                    : 'bg-white/[0.06] text-white/90 rounded-tl-sm border border-white/[0.08]'
                 }`}>
                   <p className="text-sm break-words leading-relaxed">{msg.content}</p>
                 </div>
@@ -698,18 +744,35 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-[#030405] overflow-hidden relative">
-      {/* Planetary background */}
+      {/* Enhanced planetary background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[10%] right-[5%] w-[300px] h-[300px] rounded-full bg-lime-500/[0.015] blur-3xl" />
-        <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-teal-500/[0.01] blur-3xl" />
-        <div className="absolute top-[40%] left-[30%] w-[200px] h-[200px] rounded-full bg-lime-400/[0.01] blur-2xl" />
-        {/* Floating code symbols */}
-        <div className="code-particle" style={{left: '10%', animationDelay: '0s'}}>{'{ }'}</div>
-        <div className="code-particle" style={{left: '25%', animationDelay: '5s'}}>{'</>'}</div>
-        <div className="code-particle" style={{left: '40%', animationDelay: '10s'}}>{'=>;'}</div>
-        <div className="code-particle" style={{left: '60%', animationDelay: '3s'}}>{'[]'}</div>
-        <div className="code-particle" style={{left: '75%', animationDelay: '8s'}}>{'()'}</div>
-        <div className="code-particle" style={{left: '90%', animationDelay: '15s'}}>{'&&'}</div>
+        {/* Planet 1 — large green glow */}
+        <div className="absolute top-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-lime-500/[0.03] blur-3xl animate-pulse" style={{animationDuration: '8s'}} />
+        {/* Planet 2 — teal */}
+        <div className="absolute bottom-[15%] left-[5%] w-[350px] h-[350px] rounded-full bg-teal-500/[0.02] blur-3xl animate-pulse" style={{animationDuration: '12s'}} />
+        {/* Planet 3 — small bright */}
+        <div className="absolute top-[35%] left-[25%] w-[180px] h-[180px] rounded-full bg-lime-400/[0.02] blur-2xl animate-pulse" style={{animationDuration: '6s'}} />
+        {/* Planet 4 — purple accent */}
+        <div className="absolute top-[60%] right-[30%] w-[250px] h-[250px] rounded-full bg-purple-500/[0.015] blur-3xl animate-pulse" style={{animationDuration: '10s'}} />
+        
+        {/* Floating code symbols — MORE VISIBLE */}
+        <div className="code-particle" style={{left: '8%', animationDelay: '0s', animationDuration: '18s'}}>{'{ }'}</div>
+        <div className="code-particle" style={{left: '22%', animationDelay: '3s', animationDuration: '22s'}}>{'</>'}</div>
+        <div className="code-particle" style={{left: '38%', animationDelay: '7s', animationDuration: '20s'}}>{'=>;'}</div>
+        <div className="code-particle" style={{left: '55%', animationDelay: '2s', animationDuration: '25s'}}>{'[]'}</div>
+        <div className="code-particle" style={{left: '70%', animationDelay: '5s', animationDuration: '19s'}}>{'()'}</div>
+        <div className="code-particle" style={{left: '85%', animationDelay: '9s', animationDuration: '21s'}}>{'&&'}</div>
+        <div className="code-particle" style={{left: '15%', animationDelay: '12s', animationDuration: '23s'}}>{'++'}</div>
+        <div className="code-particle" style={{left: '45%', animationDelay: '15s', animationDuration: '17s'}}>{'==='}</div>
+        <div className="code-particle" style={{left: '65%', animationDelay: '4s', animationDuration: '24s'}}>{'!!'}</div>
+        <div className="code-particle" style={{left: '92%', animationDelay: '11s', animationDuration: '20s'}}>{'??'}</div>
+        
+        {/* Stars */}
+        <div className="absolute top-[10%] left-[15%] w-1 h-1 rounded-full bg-white/20 animate-pulse" />
+        <div className="absolute top-[25%] left-[60%] w-0.5 h-0.5 rounded-full bg-white/30 animate-pulse" style={{animationDelay: '1s'}} />
+        <div className="absolute top-[45%] left-[80%] w-1 h-1 rounded-full bg-lime-400/20 animate-pulse" style={{animationDelay: '2s'}} />
+        <div className="absolute top-[70%] left-[20%] w-0.5 h-0.5 rounded-full bg-white/25 animate-pulse" style={{animationDelay: '3s'}} />
+        <div className="absolute top-[85%] left-[50%] w-1 h-1 rounded-full bg-teal-400/20 animate-pulse" style={{animationDelay: '1.5s'}} />
       </div>
 
       {showSidebar && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowSidebar(false)} />}
