@@ -83,16 +83,18 @@ export const SocketProvider = ({ children }) => {
   }, [isAuthenticated, user?.id]);
 
   const joinRoom = (roomId) => {
-    if (socketRef.current && roomId) {
+    if (!roomId) return;
+    joinedRoomsRef.current.add(roomId);
+    if (socketRef.current) {
       socketRef.current.emit('join-room', roomId);
-      joinedRoomsRef.current.add(roomId);
     }
   };
 
   const leaveRoom = (roomId) => {
-    if (socketRef.current && roomId) {
+    if (!roomId) return;
+    joinedRoomsRef.current.delete(roomId);
+    if (socketRef.current) {
       socketRef.current.emit('leave-room', roomId);
-      joinedRoomsRef.current.delete(roomId);
     }
   };
 

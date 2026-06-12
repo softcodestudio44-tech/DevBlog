@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield } from 'lucide-react';
 import api from '../api/axios';
@@ -11,6 +11,7 @@ const UserProfile = () => {
   const { id } = useParams();
   const { user: currentUser } = useAuth();
   const { socket } = useSocket();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -205,29 +206,38 @@ const UserProfile = () => {
                     <p className="text-white/70 text-sm max-w-lg mb-4">{profile.bio}</p>
                   )}
 
-                  {/* Follow Button - Toggle Follow/Unfollow */}
+                  {/* Follow Button + DM action */}
                   {!isOwnProfile && currentUser && (
-                    <button
-                      onClick={handleFollow}
-                      disabled={followLoading}
-                      className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all mb-4 ${
-                        profile.isFollowing
-                          ? 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-red-400 hover:border-red-400/30'
-                          : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30'
-                      } disabled:opacity-50`}
-                    >
-                      {profile.isFollowing ? (
-                        <>
-                          <UserCheck className="w-4 h-4" />
-                          Following
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="w-4 h-4" />
-                          Follow
-                        </>
-                      )}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                      <button
+                        onClick={handleFollow}
+                        disabled={followLoading}
+                        className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all ${
+                          profile.isFollowing
+                            ? 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-red-400 hover:border-red-400/30'
+                            : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30'
+                        } disabled:opacity-50`}
+                      >
+                        {profile.isFollowing ? (
+                          <>
+                            <UserCheck className="w-4 h-4" />
+                            Following
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-4 h-4" />
+                            Follow
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => navigate(`/chat?user=${profile.id}`)}
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 transition-all"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Message
+                      </button>
+                    </div>
                   )}
 
                   {/* Social Links */}
@@ -380,47 +390,77 @@ const UserProfile = () => {
               <div className="overflow-y-auto p-4 space-y-3">
                 {showModal === 'followers' && profile.followersList && profile.followersList.length > 0 ? (
                   profile.followersList.map((follower) => (
-                    <Link
+                    <div
                       key={follower.id}
-                      to={`/user/${follower.id}`}
-                      onClick={() => setShowModal(null)}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+                      className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
                     >
-                      {follower.avatar ? (
-                        <img
-                          src={follower.avatar}
-                          alt={follower.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
-                          {follower.name && follower.name[0] ? follower.name[0] : 'U'}
-                        </div>
-                      )}
-                      <span className="text-white/80 font-medium">{follower.name}</span>
-                    </Link>
+                      <Link
+                        to={`/user/${follower.id}`}
+                        onClick={() => setShowModal(null)}
+                        className="flex items-center gap-3 flex-1"
+                      >
+                        {follower.avatar ? (
+                          <img
+                            src={follower.avatar}
+                            alt={follower.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                            {follower.name && follower.name[0] ? follower.name[0] : 'U'}
+                          </div>
+                        )}
+                        <span className="text-white/80 font-medium">{follower.name}</span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModal(null);
+                          navigate(`/chat?user=${follower.id}`);
+                        }}
+                        className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
+                        title={`Message ${follower.name}`}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))
                 ) : showModal === 'following' && profile.followingList && profile.followingList.length > 0 ? (
                   profile.followingList.map((following) => (
-                    <Link
+                    <div
                       key={following.id}
-                      to={`/user/${following.id}`}
-                      onClick={() => setShowModal(null)}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+                      className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
                     >
-                      {following.avatar ? (
-                        <img
-                          src={following.avatar}
-                          alt={following.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
-                          {following.name && following.name[0] ? following.name[0] : 'U'}
-                        </div>
-                      )}
-                      <span className="text-white/80 font-medium">{following.name}</span>
-                    </Link>
+                      <Link
+                        to={`/user/${following.id}`}
+                        onClick={() => setShowModal(null)}
+                        className="flex items-center gap-3 flex-1"
+                      >
+                        {following.avatar ? (
+                          <img
+                            src={following.avatar}
+                            alt={following.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                            {following.name && following.name[0] ? following.name[0] : 'U'}
+                          </div>
+                        )}
+                        <span className="text-white/80 font-medium">{following.name}</span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModal(null);
+                          navigate(`/chat?user=${following.id}`);
+                        }}
+                        className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
+                        title={`Message ${following.name}`}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))
                 ) : (
                   <p className="text-center text-white/40 py-8">

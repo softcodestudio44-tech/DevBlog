@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageCircle, Send, Users, Hash, Menu, X, ArrowLeft, 
   Trash2, Paperclip, Mic, CheckCheck, MoreVertical, Phone, Video,
-  Search, UserX
+  Search, UserX, CornerUpLeft
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,7 @@ import { useSocket } from '../context/SocketContext';
 
 const Chat = ({ defaultTab = 'channels' }) => {
   const { user, isAuthenticated } = useAuth();
-  const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping } = useSocket();
+  const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping, connected } = useSocket();
   
   // Channel state
   const [rooms, setRooms] = useState([]);
@@ -28,14 +28,21 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const typingTimerRef = useRef(null);
   // Separate dedupe sets so DM and channel messages never suppress each other.
   const processedChannelMessagesRef = useRef(new Set());
   const processedDMessagesRef = useRef(new Set());
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const isChannelTab = defaultTab === 'channels';
+  const activeRoomId = activeRoom?.id || (activeDMUser && user?.id
+    ? `dm:${[user.id, activeDMUser.id].sort().join(':')}`
+    : null);
 
   // ---- Fetch initial data ----
   useEffect(() => {
@@ -106,6 +113,12 @@ const Chat = ({ defaultTab = 'channels' }) => {
         const isToActiveUser = message.authorId === user?.id;
         if (isFromActiveUser || isToActiveUser) {
           setDmMessages(prev => {
+            const tempIndex = prev.findIndex(m => m.id.startsWith('temp-') && m.authorId === message.authorId && m.content === message.content);
+            if (tempIndex >= 0) {
+              const updated = [...prev];
+              updated[tempIndex] = message;
+              return updated;
+            }
             if (prev.some(m => m.id === message.id)) return prev;
             return [...prev, message];
           });
@@ -113,16 +126,24 @@ const Chat = ({ defaultTab = 'channels' }) => {
       }
     };
 
+    const handleMessageDeleted = ({ messageId }) => {
+      if (!messageId) return;
+      setChannelMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setDmMessages(prev => prev.filter(msg => msg.id !== messageId));
+    };
+
     socket.on('new-message', handleNewChannelMessage);
     socket.on('new-dm', handleNewDM);
     socket.on('messages-cleared', () => {
       if (activeRoom) setChannelMessages([]);
     });
+    socket.on('message-deleted', handleMessageDeleted);
 
     return () => {
       socket.off('new-message', handleNewChannelMessage);
       socket.off('new-dm', handleNewDM);
       socket.off('messages-cleared');
+      socket.off('message-deleted', handleMessageDeleted);
     };
   }, [socket, activeRoom, activeDMUser, user]);
 
@@ -158,6 +179,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
     if (activeRoom) leaveRoom(activeRoom.id);
     setActiveRoom(room);
     setActiveDMUser(null);
+    setReplyTo(null);
     setShowSidebar(false);
     joinRoom(room.id);
     try {
@@ -165,15 +187,27 @@ const Chat = ({ defaultTab = 'channels' }) => {
       setChannelMessages(res.data || []);
       processedChannelMessagesRef.current.clear();
       processedDMessagesRef.current.clear();
-      res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
     } catch (err) { console.error(err); }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const dmUserId = searchParams.get('user') || searchParams.get('dm');
+    if (!dmUserId) return;
+    openDMUserById(dmUserId);
+    const params = new URLSearchParams(searchParams);
+    params.delete('user');
+    params.delete('dm');
+    const query = params.toString();
+    navigate(`${window.location.pathname}${query ? `?${query}` : ''}`, { replace: true });
+  }, [searchParams, isAuthenticated, user, navigate]);
 
   const startDM = async (targetUser) => {
     if (!targetUser || targetUser.id === user?.id) return; // Prevent self-DM
     if (activeRoom) leaveRoom(activeRoom.id);
     setActiveRoom(null);
     setActiveDMUser(targetUser);
+    setReplyTo(null);
     setShowSidebar(false);
     const sorted = [user.id, targetUser.id].sort();
     const roomName = `dm:${sorted[0]}:${sorted[1]}`;
@@ -186,26 +220,41 @@ const Chat = ({ defaultTab = 'channels' }) => {
     } catch (err) { setDmMessages([]); }
   };
 
+  const openDMUserById = useCallback(async (targetUserId) => {
+    if (!targetUserId || !user?.id || targetUserId === user.id) return;
+    try {
+      const res = await api.get(`/users/${targetUserId}`);
+      const targetUser = {
+        id: res.data.id,
+        name: res.data.name,
+        avatar: res.data.avatar,
+      };
+      await startDM(targetUser);
+    } catch (err) {
+      console.error('Failed to open DM from query params:', err);
+    }
+  }, [user?.id]);
+
   const handleSend = (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
     
-    const content = newMessage.trim();
+    const content = replyTo
+      ? `Replying to ${replyTo.authorName}: ${newMessage.trim()}`
+      : newMessage.trim();
     const tempId = `temp-${Date.now()}`;
     
     if (activeDMUser) {
-      // Prevent self-DM
       if (activeDMUser.id === user?.id) {
         alert("You can't message yourself!");
         return;
       }
-      
-      socket.emit('send-dm', {
+
+      socket?.emit('send-dm', {
         recipientId: activeDMUser.id,
         content: content,
       });
       
-      // Optimistically add to dmMessages
       const optimisticMessage = {
         id: tempId,
         content: content,
@@ -215,7 +264,6 @@ const Chat = ({ defaultTab = 'channels' }) => {
       };
       setDmMessages(prev => [...prev, optimisticMessage]);
       
-      // Update DM history
       setDmHistory(prev => {
         const existingIndex = prev.findIndex(u => u.id === activeDMUser.id);
         const newEntry = {
@@ -239,14 +287,35 @@ const Chat = ({ defaultTab = 'channels' }) => {
     } else return;
     
     setNewMessage('');
+    setReplyTo(null);
     if (inputRef.current) inputRef.current.focus();
   };
 
   const handleTyping = (e) => {
     setNewMessage(e.target.value);
-    if (activeRoom) {
-      setTyping(activeRoom.id, true);
-      setTimeout(() => setTyping(activeRoom.id, false), 2000);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    if (activeRoomId) {
+      setTyping(activeRoomId, true);
+      typingTimerRef.current = setTimeout(() => setTyping(activeRoomId, false), 1200);
+    }
+  };
+
+  const handleReplyToMessage = (message) => {
+    setReplyTo({ id: message.id, authorName: message.author?.name || 'Message', content: message.content });
+    if (inputRef.current) inputRef.current.focus();
+  };
+
+  const clearReply = () => setReplyTo(null);
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!messageId) return;
+    if (!window.confirm('Delete this message?')) return;
+    try {
+      await api.delete(`/chat/messages/${messageId}`);
+      setChannelMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setDmMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (err) {
+      console.error('Delete message failed:', err);
     }
   };
 
@@ -256,19 +325,18 @@ const Chat = ({ defaultTab = 'channels' }) => {
     try {
       await api.delete(`/chat/rooms/${activeRoom.id}/clear`);
       setChannelMessages([]);
-      processedMessagesRef.current.clear();
+      processedChannelMessagesRef.current.clear();
     } catch (err) { console.error(err); }
   };
+
 
   const formatTime = (dateStr) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
   const isUserOnline = (uid) => onlineUsers.some(u => u.id === uid);
 
-  const currentTyping = activeRoom
-    ? Object.entries(typingUsers)
-        .filter(([id, name]) => name && id !== user?.id)
-        .map(([_, name]) => name)
-    : [];
+  const currentTyping = Object.entries(typingUsers)
+    .filter(([id, name]) => name && id !== user?.id)
+    .map(([, name]) => name);
 
   if (loading) {
     return (
@@ -503,7 +571,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lime-500/5 border border-lime-500/10">
             <Users className="w-3.5 h-3.5 text-lime-400/60" />
-            <span className="text-xs text-lime-400/60">{otherOnlineUsers.length}</span>
+            <span className="text-xs text-lime-400/60">{onlineUsers.length} online</span>
           </div>
           {isAdmin && (
             <button onClick={handleClearChat} className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" title="Clear chat">
@@ -591,40 +659,49 @@ const Chat = ({ defaultTab = 'channels' }) => {
       
       {channelMessages.map((msg, idx) => {
         const prevMsg = channelMessages[idx - 1];
-        const showHeader = !prevMsg || prevMsg.authorId !== msg.authorId || 
+        const showHeader = !prevMsg || prevMsg.authorId !== msg.authorId ||
           (new Date(msg.createdAt) - new Date(prevMsg.createdAt)) > 300000;
-        
+        const isOwn = msg.authorId === user?.id;
+        const canDelete = isOwn || isAdmin;
+
         return (
-          <div key={msg.id} className={`group ${showHeader ? 'mt-4' : 'mt-0.5'}`}>
-            {showHeader ? (
-              <div className="flex gap-3">
-                <Link to={`/user/${msg.authorId}`} className="flex-shrink-0 self-start mt-0.5">
-                  {msg.author?.avatar ? (
-                    <img src={msg.author.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
-                      {msg.author?.name?.[0] || 'U'}
+          <div key={msg.id} className={`group ${showHeader ? 'mt-4' : 'mt-0.5'} flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            <div className="max-w-[75%]">
+              {showHeader && (
+                <div className="flex gap-3 mb-2 items-center">
+                  <Link to={`/user/${msg.authorId}`} className="flex-shrink-0 self-start mt-0.5">
+                    {msg.author?.avatar ? (
+                      <img src={msg.author.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
+                        {msg.author?.name?.[0] || 'U'}
+                      </div>
+                    )}
+                  </Link>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <Link to={`/user/${msg.authorId}`} className="text-sm font-semibold text-lime-300/80 hover:text-lime-300 hover:underline truncate">
+                        {msg.author?.name}
+                      </Link>
+                      <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
                     </div>
-                  )}
-                </Link>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 mb-0.5">
-                    <Link to={`/user/${msg.authorId}`} className="text-sm font-semibold text-lime-300/80 hover:text-lime-300 hover:underline">
-                      {msg.author?.name}
-                    </Link>
-                    <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-white/80 leading-relaxed break-words">{msg.content}</p>
+                </div>
+              )}
+              <div className={`relative px-4 py-3 rounded-2xl ${isOwn ? 'bg-lime-600 text-white rounded-br-sm' : 'bg-white/[0.06] text-white/90 rounded-bl-sm border border-white/[0.08]'}`}>
+                <p className="text-sm break-words leading-relaxed">{msg.content}</p>
+                <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
+                  <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                    <CornerUpLeft className="w-4 h-4" />
+                  </button>
+                  {canDelete && (
+                    <button onClick={() => handleDeleteMessage(msg.id)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="flex gap-3 pl-12">
-                <span className="text-[10px] text-white/0 group-hover:text-white/20 w-10 text-right flex-shrink-0 pt-1">
-                  {formatTime(msg.createdAt)}
-                </span>
-                <p className="text-sm text-white/80 leading-relaxed break-words flex-1">{msg.content}</p>
-              </div>
-            )}
+            </div>
           </div>
         );
       })}
@@ -667,10 +744,11 @@ const Chat = ({ defaultTab = 'channels' }) => {
         const isOwn = msg.authorId === user?.id;
         const prevMsg = dmMessages[idx - 1];
         const nextMsg = dmMessages[idx + 1];
-        const showTime = !nextMsg || nextMsg.authorId !== msg.authorId || 
+        const showTime = !nextMsg || nextMsg.authorId !== msg.authorId ||
           (new Date(nextMsg.createdAt) - new Date(msg.createdAt)) > 300000;
         const isFirstInGroup = !prevMsg || prevMsg.authorId !== msg.authorId;
-        
+        const canDelete = isOwn || isAdmin;
+
         return (
           <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-3' : 'mt-0.5'}`}>
             <div className={`flex gap-2 max-w-[75%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -686,14 +764,24 @@ const Chat = ({ defaultTab = 'channels' }) => {
                 </Link>
               )}
               {!isFirstInGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
-              
-              <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+
+              <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} relative group`}>
                 <div className={`px-4 py-2 rounded-2xl ${
-                  isOwn 
-                    ? 'bg-lime-600 text-white rounded-tr-sm' 
+                  isOwn
+                    ? 'bg-lime-600 text-white rounded-tr-sm'
                     : 'bg-white/[0.06] text-white/90 rounded-tl-sm border border-white/[0.08]'
                 }`}>
                   <p className="text-sm break-words leading-relaxed">{msg.content}</p>
+                </div>
+                <div className="absolute top-1 right-1 hidden group-hover:flex gap-1">
+                  <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                    <CornerUpLeft className="w-4 h-4" />
+                  </button>
+                  {canDelete && (
+                    <button onClick={() => handleDeleteMessage(msg.id)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {showTime && (
                   <span className={`text-[10px] text-white/30 mt-1 ${isOwn ? 'mr-1' : 'ml-1'}`}>
@@ -712,6 +800,16 @@ const Chat = ({ defaultTab = 'channels' }) => {
   // ========== INPUT AREA ==========
   const renderInput = () => (
     <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
+      {replyTo && (
+        <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-between gap-3">
+          <div className="text-xs text-white/70 truncate">
+            Replying to <span className="text-white/90 font-medium">{replyTo.authorName}</span>
+          </div>
+          <button type="button" onClick={clearReply} className="text-white/50 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <form onSubmit={handleSend} className="flex items-end gap-2">
         <button type="button" className="p-2.5 rounded-full hover:bg-white/5 text-white/30 transition-colors flex-shrink-0">
           <Paperclip className="w-5 h-5" />
@@ -797,6 +895,11 @@ const Chat = ({ defaultTab = 'channels' }) => {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full overflow-hidden">
+        {!connected && (
+          <div className="absolute inset-x-0 top-0 z-30 bg-amber-500/10 text-amber-200 text-center py-1 text-[11px] border-b border-amber-500/20">
+            Reconnecting chat... updates will arrive shortly.
+          </div>
+        )}
         {isChannelTab ? renderCommunityHeader() : renderMessagesHeader()}
         {isChannelTab ? renderCommunityMessages() : renderDMMessages()}
         {isAuthenticated ? renderInput() : (
