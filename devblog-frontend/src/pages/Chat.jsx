@@ -408,14 +408,14 @@ const Chat = ({ defaultTab = 'channels' }) => {
   // ========== COMMUNITY SIDEBAR (Channels only) ==========
   const renderCommunitySidebar = () => (
     <div className="flex flex-col h-full">
-      <div className="p-4 mb-4 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-2xl shadow-inner shadow-black/20">
+      <div className="p-4 mb-4 rounded-3xl bg-[#081114]/95 border border-slate-700/30 shadow-inner shadow-black/20">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-lime-700 flex items-center justify-center shadow-lg shadow-lime-500/20">
-            <Users className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-900/20">
+            <Users className="w-5 h-5 text-lime-300" />
           </div>
           <div>
-            <h2 className="font-bold text-white text-sm">Community</h2>
-            <p className="text-xs text-lime-400/50">{otherOnlineUsers.length} online</p>
+            <h2 className="font-bold text-white text-sm">Channel list</h2>
+            <p className="text-xs text-slate-300/70">Public rooms and active members</p>
           </div>
         </div>
         <div className="relative">
@@ -497,14 +497,14 @@ const Chat = ({ defaultTab = 'channels' }) => {
     
     return (
       <div className="flex flex-col h-full">
-        <div className="glass p-4 mb-4 rounded-3xl shadow-inner shadow-black/20">
+        <div className="glass p-4 mb-4 rounded-3xl shadow-inner shadow-black/20 border border-lime-500/20 bg-slate-900/80">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-lime-700 flex items-center justify-center shadow-lg shadow-lime-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-lime-500/20">
               <MessageCircle className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-bold text-white text-sm">Messages</h2>
-              <p className="text-xs text-lime-400/50">{dmHistory.length} conversations</p>
+              <h2 className="font-bold text-white text-sm">Recent conversations</h2>
+              <p className="text-xs text-lime-300/70">{dmHistory.length} chats</p>
             </div>
           </div>
           <div className="relative">
@@ -700,9 +700,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const renderCommunityMessages = () => (
     <div
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
+      className="flex-1 overflow-y-auto px-4 py-4"
       style={{ scrollBehavior: 'smooth' }}
     >
+      <div className="mx-auto w-full max-w-3xl space-y-1">
       {channelMessages.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <div className="w-20 h-20 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
@@ -778,6 +779,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 
@@ -785,9 +787,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const renderDMMessages = () => (
     <div
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto px-4 py-6 space-y-1"
+      className="flex-1 overflow-y-auto px-4 py-6"
       style={{ scrollBehavior: 'smooth' }}
     >
+      <div className="mx-auto w-full max-w-4xl space-y-1">
       {dmMessages.length === 0 && activeDMUser && (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <div className="w-20 h-20 rounded-full bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
@@ -852,6 +855,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           </div>
         );
       })}
+      </div>
     </div>
   );
 
