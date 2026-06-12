@@ -13,10 +13,11 @@ import EditPost from './pages/EditPost';
 import PostDetail from './pages/PostDetail';
 import UserProfile from './pages/UserProfile';
 import EditProfile from './pages/EditProfile';
-import Chat from './pages/Chat';
+import Community from './pages/Community';
+import Messages from './pages/Messages';
 import BettyAI from './pages/BettyAI';
 
-const NO_FOOTER_PAGES = ['/chat', '/betty-ai', '/dm', '/community', '/messages'];
+const NO_FOOTER_PAGES = ['/community', '/messages', '/betty-ai'];
 
 function AppContent() {
   const location = useLocation();
@@ -43,12 +44,12 @@ function AppContent() {
             <Route path="/betty-ai" element={<BettyAI />} />
 
             {/* NEW: Separate Community (channels) and Messages (DMs) */}
-            <Route path="/community" element={<Chat defaultTab="channels" />} />
-            <Route path="/messages" element={<Chat defaultTab="dms" />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/messages" element={<Messages />} />
 
-            {/* Keep old routes in case of bookmarks */}
-            <Route path="/chat" element={<Chat defaultTab="channels" />} />
-            <Route path="/dm" element={<Chat defaultTab="dms" />} />
+            {/* Redirect old routes to new ones */}
+            <Route path="/chat" element={<Community />} />
+            <Route path="/dm" element={<Messages />} />
           </Routes>
           {showFooter && <Footer />}
         </main>
