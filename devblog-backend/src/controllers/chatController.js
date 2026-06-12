@@ -64,12 +64,21 @@ const getDMHistory = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Find all DM rooms where this user is a participant
+    // Find all DM rooms where this user is actually a participant.
+    // Room names are formatted as "dm:<idA>:<idB>" (sorted), so we
+    // only match rooms where userId appears as idA or idB — not
+    // every "dm:" room in the database.
     const dmRooms = await prisma.chatRoom.findMany({
       where: {
-        name: {
-          startsWith: 'dm:',
-        },
+        AND: [
+          { name: { startsWith: 'dm:' } },
+          {
+            OR: [
+              { name: { startsWith: `dm:${userId}:` } },
+              { name: { endsWith: `:${userId}` } },
+            ],
+          },
+        ],
       },
       include: {
         messages: {
@@ -88,27 +97,39 @@ const getDMHistory = async (req, res) => {
     for (const room of dmRooms) {
       const parts = room.name.split(':');
       if (parts.length === 3) {
-        const otherId = parts[1] === userId ? parts[2] : parts[1];
-        if (otherId && otherId !== userId) {
-          // Get user info
-          const otherUser = await prisma.user.findUnique({
-            where: { id: otherId },
-            select: { id: true, name: true, avatar: true },
-          });
+        const [, idA, idB] = parts;
 
-          if (otherUser) {
-            dmPartners.push({
-              id: otherUser.id,
-              name: otherUser.name,
-              avatar: otherUser.avatar,
-              roomName: room.name,
-              lastMessage: room.messages[0]?.content || '',
-              lastMessageAt: room.messages[0]?.createdAt || null,
-            });
-          }
+        // Double-check this room actually belongs to the current user
+        if (idA !== userId && idB !== userId) continue;
+
+        const otherId = idA === userId ? idB : idA;
+        if (!otherId || otherId === userId) continue;
+
+        // Get user info
+        const otherUser = await prisma.user.findUnique({
+          where: { id: otherId },
+          select: { id: true, name: true, avatar: true },
+        });
+
+        if (otherUser) {
+          dmPartners.push({
+            id: otherUser.id,
+            name: otherUser.name,
+            avatar: otherUser.avatar,
+            roomName: room.name,
+            lastMessage: room.messages[0]?.content || '',
+            lastMessageAt: room.messages[0]?.createdAt || null,
+          });
         }
       }
     }
+
+    // Sort by most recent message first
+    dmPartners.sort((a, b) => {
+      const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return bTime - aTime;
+    });
 
     res.json(dmPartners);
   } catch (error) {
