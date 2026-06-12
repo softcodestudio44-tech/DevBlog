@@ -151,6 +151,34 @@ const createRoom = async (req, res) => {
   }
 };
 
+const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const message = await prisma.chatMessage.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    if (message.authorId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete this message' });
+    }
+
+    await prisma.chatMessage.delete({ where: { id: messageId } });
+
+    if (global.io) {
+      global.io.to(message.roomId).emit('message-deleted', { messageId });
+    }
+
+    res.json({ message: 'Message deleted', messageId });
+  } catch (error) {
+    console.error('deleteMessage error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Admin: Clear all messages in a room
 const clearRoomMessages = async (req, res) => {
   try {
@@ -168,6 +196,10 @@ const clearRoomMessages = async (req, res) => {
       where: { roomId: room.id },
     });
 
+    if (global.io) {
+      global.io.to(room.id).emit('messages-cleared', { roomId: room.id });
+    }
+
     res.json({ message: 'All messages cleared' });
   } catch (error) {
     console.error('clearRoomMessages error:', error);
@@ -175,4 +207,4 @@ const clearRoomMessages = async (req, res) => {
   }
 };
 
-module.exports = { getRooms, getMessages, getDMHistory, createRoom, clearRoomMessages };
+module.exports = { getRooms, getMessages, getDMHistory, createRoom, deleteMessage, clearRoomMessages };
