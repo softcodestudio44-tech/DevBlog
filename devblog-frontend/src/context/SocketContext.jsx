@@ -17,10 +17,16 @@ export const SocketProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
-    // Close existing socket before creating new one
+    // Close existing socket before creating a new one (so we can
+    // re-authenticate whenever login state or token changes)
     if (socketRef.current) {
+      socketRef.current.removeAllListeners();
       socketRef.current.close();
+      socketRef.current = null;
       joinedRoomsRef.current.clear();
+      setSocket(null);
+      setConnected(false);
+      setOnlineUsers([]);
     }
 
     const newSocket = io(SOCKET_URL, {
@@ -32,7 +38,7 @@ export const SocketProvider = ({ children }) => {
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ Socket connected');
+      console.log('✅ Socket connected', isAuthenticated ? `(user: ${user?.id})` : '(guest)');
       setConnected(true);
       // Re-join all rooms after reconnect
       joinedRoomsRef.current.forEach((roomId) => {
@@ -65,10 +71,16 @@ export const SocketProvider = ({ children }) => {
     setSocket(newSocket);
 
     return () => {
+      newSocket.removeAllListeners();
       newSocket.close();
+      if (socketRef.current === newSocket) {
+        socketRef.current = null;
+      }
       joinedRoomsRef.current.clear();
     };
-  }, []); // NO dependency on isAuthenticated — stable connection
+    // Recreate the socket whenever auth state changes so the new
+    // connection authenticates with the current token.
+  }, [isAuthenticated, user?.id]);
 
   const joinRoom = (roomId) => {
     if (socketRef.current && roomId) {
