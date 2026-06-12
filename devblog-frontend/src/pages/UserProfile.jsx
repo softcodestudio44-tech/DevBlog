@@ -274,7 +274,7 @@ const UserProfile = () => {
               </div>
 
               {/* TikTok-Style Stats - Clickable to open modal */}
-              <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
                 <button 
                   onClick={() => setShowModal('following')}
                   className="text-center bg-white/5 border border-white/10 rounded-3xl py-3 transition-colors hover:bg-white/10 shadow-inner shadow-black/10"
@@ -392,12 +392,12 @@ const UserProfile = () => {
                   profile.followersList.map((follower) => (
                     <div
                       key={follower.id}
-                      className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+                      className="flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors min-w-0"
                     >
                       <Link
                         to={`/user/${follower.id}`}
                         onClick={() => setShowModal(null)}
-                        className="flex items-center gap-3 flex-1"
+                        className="flex items-center gap-3 flex-1 min-w-0"
                       >
                         {follower.avatar ? (
                           <img
@@ -410,7 +410,7 @@ const UserProfile = () => {
                             {follower.name && follower.name[0] ? follower.name[0] : 'U'}
                           </div>
                         )}
-                        <span className="text-white/80 font-medium">{follower.name}</span>
+                        <span className="text-white/80 font-medium truncate">{follower.name}</span>
                       </Link>
                       <button
                         type="button"
@@ -429,12 +429,12 @@ const UserProfile = () => {
                   profile.followingList.map((following) => (
                     <div
                       key={following.id}
-                      className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors"
+                      className="flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors min-w-0"
                     >
                       <Link
                         to={`/user/${following.id}`}
                         onClick={() => setShowModal(null)}
-                        className="flex items-center gap-3 flex-1"
+                        className="flex items-center gap-3 flex-1 min-w-0"
                       >
                         {following.avatar ? (
                           <img
@@ -447,7 +447,7 @@ const UserProfile = () => {
                             {following.name && following.name[0] ? following.name[0] : 'U'}
                           </div>
                         )}
-                        <span className="text-white/80 font-medium">{following.name}</span>
+                        <span className="text-white/80 font-medium truncate">{following.name}</span>
                       </Link>
                       <button
                         type="button"

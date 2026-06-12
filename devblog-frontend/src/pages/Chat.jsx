@@ -703,7 +703,16 @@ const Chat = ({ defaultTab = 'channels' }) => {
       className="flex-1 overflow-y-auto px-4 py-4"
       style={{ scrollBehavior: 'smooth' }}
     >
-      <div className="mx-auto w-full max-w-3xl space-y-1">
+      <div className="mx-auto w-full max-w-3xl space-y-4">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-slate-100 shadow-lg shadow-black/10">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/40">Community chat</p>
+              <h2 className="text-lg font-semibold text-white">#{activeRoom?.name || 'Channel'}</h2>
+            </div>
+            <div className="text-xs text-white/50">{onlineUsers.length} online</div>
+          </div>
+        </div>
       {channelMessages.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <div className="w-20 h-20 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
@@ -790,7 +799,16 @@ const Chat = ({ defaultTab = 'channels' }) => {
       className="flex-1 overflow-y-auto px-4 py-6"
       style={{ scrollBehavior: 'smooth' }}
     >
-      <div className="mx-auto w-full max-w-4xl space-y-1">
+      <div className="mx-auto w-full max-w-4xl space-y-4">
+        <div className="rounded-3xl border border-lime-500/10 bg-slate-950/75 p-4 text-white shadow-lg shadow-black/20">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-lime-300/70">Direct message</p>
+              <h2 className="text-lg font-semibold text-white">{activeDMUser?.name || 'Select a chat'}</h2>
+            </div>
+            <div className="text-xs text-white/50">DM history</div>
+          </div>
+        </div>
       {dmMessages.length === 0 && activeDMUser && (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <div className="w-20 h-20 rounded-full bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
