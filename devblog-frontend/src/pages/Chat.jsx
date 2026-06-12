@@ -30,7 +30,9 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
-  const processedMessagesRef = useRef(new Set());
+  // Separate dedupe sets so DM and channel messages never suppress each other.
+  const processedChannelMessagesRef = useRef(new Set());
+  const processedDMessagesRef = useRef(new Set());
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const isChannelTab = defaultTab === 'channels';
@@ -54,9 +56,9 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
     // New channel message
     const handleNewChannelMessage = (message) => {
-      // Prevent duplicates
-      if (processedMessagesRef.current.has(message.id)) return;
-      processedMessagesRef.current.add(message.id);
+      // Prevent duplicates (channel only)
+      if (processedChannelMessagesRef.current.has(message.id)) return;
+      processedChannelMessagesRef.current.add(message.id);
       
       if (activeRoom && message.roomId === activeRoom.id) {
         setChannelMessages(prev => {
@@ -68,9 +70,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
     // New DM message
     const handleNewDM = (message) => {
-      // Prevent duplicates
-      if (processedMessagesRef.current.has(message.id)) return;
-      processedMessagesRef.current.add(message.id);
+      // Prevent duplicates (DM only)
+      if (processedDMessagesRef.current.has(message.id)) return;
+      processedDMessagesRef.current.add(message.id);
+
 
       // Don't show own messages in sidebar update (already handled optimistically)
       const isFromMe = message.authorId === user?.id;
@@ -160,8 +163,9 @@ const Chat = ({ defaultTab = 'channels' }) => {
     try {
       const res = await api.get(`/chat/rooms/${room.id}/messages`);
       setChannelMessages(res.data || []);
-      processedMessagesRef.current.clear();
-      res.data?.forEach(m => processedMessagesRef.current.add(m.id));
+      processedChannelMessagesRef.current.clear();
+      processedDMessagesRef.current.clear();
+      res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
     } catch (err) { console.error(err); }
   };
 
@@ -177,8 +181,8 @@ const Chat = ({ defaultTab = 'channels' }) => {
     try {
       const res = await api.get(`/chat/rooms/${roomName}/messages`);
       setDmMessages(res.data || []);
-      processedMessagesRef.current.clear();
-      res.data?.forEach(m => processedMessagesRef.current.add(m.id));
+      processedDMessagesRef.current.clear();
+      res.data?.forEach(m => processedDMessagesRef.current.add(m.id));
     } catch (err) { setDmMessages([]); }
   };
 
