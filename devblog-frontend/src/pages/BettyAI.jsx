@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Code, FileText, Sparkles, Loader2, Copy, Check, Mic, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import MarkdownRenderer from '../components/MarkdownRenderer';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const BettyAI = () => {
   const { user } = useAuth();
@@ -242,7 +244,11 @@ const BettyAI = () => {
                     msg.from === 'user' ? 'message-user' : 'message-bot'
                   }`}>
                     <div className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">
-                      {msg.text}
+                      {msg.from === 'betty' ? (
+                        <MarkdownRenderer content={msg.text} />
+                      ) : (
+                        msg.text
+                      )}
                     </div>
                     
                     {msg.from === 'betty' && (

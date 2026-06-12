@@ -208,14 +208,14 @@ const UserProfile = () => {
 
                   {/* Follow Button + DM action */}
                   {!isOwnProfile && currentUser && (
-                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="flex flex-wrap items-center gap-3 mb-4 bg-white/5 border border-white/10 rounded-3xl p-3 shadow-inner shadow-black/10">
                       <button
                         onClick={handleFollow}
                         disabled={followLoading}
-                        className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all ${
+                        className={`flex items-center gap-2 px-5 py-2 rounded-2xl text-sm font-medium transition-all ${
                           profile.isFollowing
-                            ? 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-red-400 hover:border-red-400/30'
-                            : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30'
+                            ? 'bg-white/10 border border-white/10 text-white/60 hover:bg-white/15 hover:text-red-400 hover:border-red-400/30'
+                            : 'bg-lime-500/20 border border-lime-500/30 text-emerald-400 hover:bg-lime-500/30'
                         } disabled:opacity-50`}
                       >
                         {profile.isFollowing ? (
@@ -231,7 +231,7 @@ const UserProfile = () => {
                         )}
                       </button>
                       <button
-                        onClick={() => navigate(`/chat?user=${profile.id}`)}
+                        onClick={() => navigate(`/dm?user=${profile.id}`)}
                         className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 transition-all"
                       >
                         <MessageCircle className="w-4 h-4" />
@@ -277,23 +277,23 @@ const UserProfile = () => {
               <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
                 <button 
                   onClick={() => setShowModal('following')}
-                  className="text-center hover:bg-white/5 rounded-xl py-2 transition-colors"
+                  className="text-center bg-white/5 border border-white/10 rounded-3xl py-3 transition-colors hover:bg-white/10 shadow-inner shadow-black/10"
                 >
                   <div className="text-2xl font-bold gradient-text">{profile.followingCount || 0}</div>
                   <div className="text-xs text-white/50">Following</div>
                 </button>
                 <button 
                   onClick={() => setShowModal('followers')}
-                  className="text-center hover:bg-white/5 rounded-xl py-2 transition-colors"
+                  className="text-center bg-white/5 border border-white/10 rounded-3xl py-3 transition-colors hover:bg-white/10 shadow-inner shadow-black/10"
                 >
                   <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
                   <div className="text-xs text-white/50">Followers</div>
                 </button>
-                <div className="text-center">
+                <div className="text-center bg-white/5 border border-white/10 rounded-3xl py-4 shadow-inner shadow-black/10">
                   <div className="text-2xl font-bold gradient-text">{profile.likeCount || 0}</div>
                   <div className="text-xs text-white/50">Likes</div>
                 </div>
-                <div className="text-center">
+                <div className="text-center bg-white/5 border border-white/10 rounded-3xl py-4 shadow-inner shadow-black/10">
                   <div className="text-2xl font-bold gradient-text">{profile.postCount || 0}</div>
                   <div className="text-xs text-white/50">Posts</div>
                 </div>
@@ -416,7 +416,7 @@ const UserProfile = () => {
                         type="button"
                         onClick={() => {
                           setShowModal(null);
-                          navigate(`/chat?user=${follower.id}`);
+                          navigate(`/dm?user=${follower.id}`);
                         }}
                         className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
                         title={`Message ${follower.name}`}
@@ -453,7 +453,7 @@ const UserProfile = () => {
                         type="button"
                         onClick={() => {
                           setShowModal(null);
-                          navigate(`/chat?user=${following.id}`);
+                          navigate(`/dm?user=${following.id}`);
                         }}
                         className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
                         title={`Message ${following.name}`}

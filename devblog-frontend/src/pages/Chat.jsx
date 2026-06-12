@@ -7,13 +7,18 @@ import {
   Search, UserX, CornerUpLeft
 } from 'lucide-react';
 import api from '../api/axios';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 
 const Chat = ({ defaultTab = 'channels' }) => {
   const { user, isAuthenticated } = useAuth();
   const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping, connected } = useSocket();
-  
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => (
+    searchParams.get('user') || searchParams.get('dm') ? 'dms' : defaultTab
+  ));
+
   // Channel state
   const [rooms, setRooms] = useState([]);
   const [activeRoom, setActiveRoom] = useState(null);
@@ -35,11 +40,10 @@ const Chat = ({ defaultTab = 'channels' }) => {
   // Separate dedupe sets so DM and channel messages never suppress each other.
   const processedChannelMessagesRef = useRef(new Set());
   const processedDMessagesRef = useRef(new Set());
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
-  const isChannelTab = defaultTab === 'channels';
+  const isChannelTab = activeTab === 'channels';
   const activeRoomId = activeRoom?.id || (activeDMUser && user?.id
     ? `dm:${[user.id, activeDMUser.id].sort().join(':')}`
     : null);
@@ -147,6 +151,39 @@ const Chat = ({ defaultTab = 'channels' }) => {
     };
   }, [socket, activeRoom, activeDMUser, user]);
 
+  // Refresh active room or DM history when reconnecting so no messages are lost while offline.
+  useEffect(() => {
+    if (!socket || !connected) return;
+
+    const refreshActiveConversation = async () => {
+      if (activeRoom) {
+        try {
+          const res = await api.get(`/chat/rooms/${activeRoom.id}/messages`);
+          setChannelMessages(res.data || []);
+          processedChannelMessagesRef.current.clear();
+          res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
+        } catch (err) {
+          console.error('Failed to refresh channel messages:', err);
+        }
+      }
+
+      if (activeDMUser) {
+        try {
+          const sorted = [user.id, activeDMUser.id].sort();
+          const roomName = `dm:${sorted[0]}:${sorted[1]}`;
+          const res = await api.get(`/chat/rooms/${roomName}/messages`);
+          setDmMessages(res.data || []);
+          processedDMessagesRef.current.clear();
+          res.data?.forEach(m => processedDMessagesRef.current.add(m.id));
+        } catch (err) {
+          console.error('Failed to refresh DM messages:', err);
+        }
+      }
+    };
+
+    refreshActiveConversation();
+  }, [socket, connected, activeRoom, activeDMUser, user]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -175,8 +212,24 @@ const Chat = ({ defaultTab = 'channels' }) => {
     } catch (err) { console.error(err); }
   };
 
+  const handleTabChange = async (tab) => {
+    if (activeTab === tab) return;
+    setActiveTab(tab);
+    setActiveRoom(null);
+    setActiveDMUser(null);
+    setReplyTo(null);
+    setShowSidebar(false);
+
+    if (tab === 'channels') {
+      await fetchRooms();
+    } else if (tab === 'dms') {
+      await fetchDMHistory();
+    }
+  };
+
   const selectRoom = async (room) => {
     if (activeRoom) leaveRoom(activeRoom.id);
+    setActiveTab('channels');
     setActiveRoom(room);
     setActiveDMUser(null);
     setReplyTo(null);
@@ -194,6 +247,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
     if (!isAuthenticated || !user) return;
     const dmUserId = searchParams.get('user') || searchParams.get('dm');
     if (!dmUserId) return;
+    setActiveTab('dms');
     openDMUserById(dmUserId);
     const params = new URLSearchParams(searchParams);
     params.delete('user');
@@ -205,6 +259,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const startDM = async (targetUser) => {
     if (!targetUser || targetUser.id === user?.id) return; // Prevent self-DM
     if (activeRoom) leaveRoom(activeRoom.id);
+    setActiveTab('dms');
     setActiveRoom(null);
     setActiveDMUser(targetUser);
     setReplyTo(null);
@@ -229,6 +284,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
         name: res.data.name,
         avatar: res.data.avatar,
       };
+      setActiveTab('dms');
       await startDM(targetUser);
     } catch (err) {
       console.error('Failed to open DM from query params:', err);
@@ -240,7 +296,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
     if (!newMessage.trim()) return;
     
     const content = replyTo
-      ? `Replying to ${replyTo.authorName}: ${newMessage.trim()}`
+      ? `> ${replyTo.content}\n\n${newMessage.trim()}`
       : newMessage.trim();
     const tempId = `temp-${Date.now()}`;
     
@@ -352,7 +408,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
   // ========== COMMUNITY SIDEBAR (Channels only) ==========
   const renderCommunitySidebar = () => (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-white/5">
+      <div className="p-4 mb-4 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-2xl shadow-inner shadow-black/20">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-lime-700 flex items-center justify-center shadow-lg shadow-lime-500/20">
             <Users className="w-5 h-5 text-white" />
@@ -397,7 +453,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
                   {room.name}
                 </span>
                 {room.topic && <span className="text-[11px] text-white/40 truncate block">{room.topic}</span>}
-                <span className="text-[10px] text-white/25">{room.memberCount || 0} members</span>
+                <span className="text-[10px] text-white/25">{room.memberCount > 0 ? room.memberCount : (onlineUsers.length || 1)} members</span>
               </div>
             </div>
           </button>
@@ -405,7 +461,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
       </div>
 
       {/* Online users widget */}
-      <div className="p-4 border-t border-white/5 flex-shrink-0">
+      <div className="p-4 mt-4 bg-white/5 border border-white/10 rounded-3xl shadow-inner shadow-black/10 flex-shrink-0">
         <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-3">ONLINE NOW</p>
         <div className="flex -space-x-2">
           {otherOnlineUsers.slice(0, 5).map(u => (
@@ -441,7 +497,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
     
     return (
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b border-white/5">
+        <div className="glass p-4 mb-4 rounded-3xl shadow-inner shadow-black/20">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500 to-lime-700 flex items-center justify-center shadow-lg shadow-lime-500/20">
               <MessageCircle className="w-5 h-5 text-white" />
@@ -474,8 +530,8 @@ const Chat = ({ defaultTab = 'channels' }) => {
                 <button
                   key={u.id}
                   onClick={() => startDM(u)}
-                  className={`w-full text-left p-3 rounded-xl transition-all ${
-                    isActive ? 'bg-lime-500/10 border border-lime-500/20' : 'hover:bg-white/[0.02] border border-transparent'
+                  className={`w-full text-left p-4 rounded-3xl transition-all ${
+                    isActive ? 'bg-lime-500/15 border border-lime-500/20 shadow-sm shadow-lime-500/10' : 'bg-white/5 border border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -510,13 +566,13 @@ const Chat = ({ defaultTab = 'channels' }) => {
 
           {/* Start new conversations */}
           {newConversations.length > 0 && (
-            <div className="p-3 space-y-1 border-t border-white/5">
+            <div className="p-3 space-y-1 border-t border-white/10">
               <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">START NEW CHAT</p>
               {newConversations.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
                 <button
                   key={u.id}
                   onClick={() => startDM(u)}
-                  className="w-full text-left p-3 rounded-xl hover:bg-white/[0.02] border border-transparent transition-all"
+                  className="w-full text-left p-3 rounded-3xl glass hover:bg-white/10 transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative flex-shrink-0">
@@ -542,7 +598,7 @@ const Chat = ({ defaultTab = 'channels' }) => {
           )}
 
           {dmHistory.length === 0 && newConversations.length === 0 && (
-            <div className="p-8 text-center">
+            <div className="glass p-8 text-center">
               <MessageCircle className="w-10 h-10 text-white/20 mx-auto mb-3" />
               <p className="text-sm text-white/40">No conversations yet.</p>
               <p className="text-xs text-white/25 mt-1">No one is online right now.</p>
@@ -688,19 +744,21 @@ const Chat = ({ defaultTab = 'channels' }) => {
                   </div>
                 </div>
               )}
-              <div className={`relative px-4 py-3 rounded-2xl ${isOwn ? 'bg-lime-600 text-white rounded-br-sm' : 'bg-white/[0.06] text-white/90 rounded-bl-sm border border-white/[0.08]'}`}>
-                <p className="text-sm break-words leading-relaxed">{msg.content}</p>
-                <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
-                  <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
-                    <CornerUpLeft className="w-4 h-4" />
-                  </button>
-                  {canDelete && (
-                    <button onClick={() => handleDeleteMessage(msg.id)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+              <div className="relative">
+              <div className={`px-4 py-3 rounded-3xl backdrop-blur-xl ${isOwn ? 'bg-lime-500/25 text-white rounded-br-sm' : 'bg-white/10 text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
+                <MarkdownRenderer content={msg.content} />
               </div>
+              <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                  <CornerUpLeft className="w-4 h-4" />
+                </button>
+                {canDelete && (
+                  <button onClick={() => handleDeleteMessage(msg.id)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
             </div>
           </div>
         );
@@ -766,14 +824,14 @@ const Chat = ({ defaultTab = 'channels' }) => {
               {!isFirstInGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
 
               <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} relative group`}>
-                <div className={`px-4 py-2 rounded-2xl ${
+                <div className={`px-4 py-2 rounded-3xl backdrop-blur-xl ${
                   isOwn
-                    ? 'bg-lime-600 text-white rounded-tr-sm'
-                    : 'bg-white/[0.06] text-white/90 rounded-tl-sm border border-white/[0.08]'
+                    ? 'bg-lime-500/25 text-white rounded-tr-sm'
+                    : 'bg-white/10 text-white/90 rounded-tl-sm border border-white/10 shadow-sm shadow-black/10'
                 }`}>
-                  <p className="text-sm break-words leading-relaxed">{msg.content}</p>
+                  <MarkdownRenderer content={msg.content} />
                 </div>
-                <div className="absolute top-1 right-1 hidden group-hover:flex gap-1">
+                <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
                     <CornerUpLeft className="w-4 h-4" />
                   </button>
@@ -801,13 +859,16 @@ const Chat = ({ defaultTab = 'channels' }) => {
   const renderInput = () => (
     <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
       {replyTo && (
-        <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-between gap-3">
-          <div className="text-xs text-white/70 truncate">
-            Replying to <span className="text-white/90 font-medium">{replyTo.authorName}</span>
+        <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-xs text-white/70">
+              Replying to <span className="text-white/90 font-medium">{replyTo.authorName}</span>
+            </div>
+            <button type="button" onClick={clearReply} className="text-white/50 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button type="button" onClick={clearReply} className="text-white/50 hover:text-white">
-            <X className="w-4 h-4" />
-          </button>
+          <p className="text-[11px] text-white/40 mt-2 line-clamp-2">{replyTo.content}</p>
         </div>
       )}
       <form onSubmit={handleSend} className="flex items-end gap-2">
@@ -889,6 +950,22 @@ const Chat = ({ defaultTab = 'channels' }) => {
           <h2 className="font-bold text-white text-sm">{isChannelTab ? 'Community' : 'Messages'}</h2>
           <button onClick={() => setShowSidebar(false)} className="p-2 rounded-lg hover:bg-white/5 text-white/30">
             <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="hidden lg:flex gap-2 px-4 py-3 border-b border-white/10 bg-white/5 backdrop-blur-xl">
+          <button
+            type="button"
+            onClick={() => handleTabChange('channels')}
+            className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition ${isChannelTab ? 'bg-lime-500/90 text-slate-950 shadow-lg shadow-lime-500/20' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
+          >
+            Channels
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('dms')}
+            className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition ${!isChannelTab ? 'bg-lime-500/90 text-slate-950 shadow-lg shadow-lime-500/20' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
+          >
+            Messages
           </button>
         </div>
         {isChannelTab ? renderCommunitySidebar() : renderMessagesSidebar()}

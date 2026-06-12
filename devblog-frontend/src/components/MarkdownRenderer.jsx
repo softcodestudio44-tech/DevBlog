@@ -19,23 +19,36 @@ const MarkdownRenderer = ({ content }) => {
       }
 
       // Handle bold text **text**
-      const parts = [];
-      const regex = /\*\*(.*?)\*\*/g;
-      let lastIndex = 0;
-      let match;
-      let keyIndex = 0;
+      const parseInline = (text) => {
+        const items = [];
+        let lastIndex = 0;
+        let keyIndex = 0;
 
-      while ((match = regex.exec(line)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push(<span key={keyIndex++}>{line.slice(lastIndex, match.index)}</span>);
+        const boldItalicRegex = /(\*\*|\*)(.*?)\1/g;
+        let match;
+
+        while ((match = boldItalicRegex.exec(text)) !== null) {
+          if (match.index > lastIndex) {
+            items.push(<span key={keyIndex++}>{text.slice(lastIndex, match.index)}</span>);
+          }
+
+          if (match[1] === '**') {
+            items.push(<strong key={keyIndex++} className="font-bold text-white">{match[2]}</strong>);
+          } else {
+            items.push(<em key={keyIndex++} className="italic text-white/80">{match[2]}</em>);
+          }
+
+          lastIndex = match.index + match[0].length;
         }
-        parts.push(<strong key={keyIndex++} className="font-bold text-white">{match[1]}</strong>);
-        lastIndex = match.index + match[0].length;
-      }
 
-      if (lastIndex < line.length) {
-        parts.push(<span key={keyIndex++}>{line.slice(lastIndex)}</span>);
-      }
+        if (lastIndex < text.length) {
+          items.push(<span key={keyIndex++}>{text.slice(lastIndex)}</span>);
+        }
+
+        return items.length ? items : [<span key={0}>{text}</span>];
+      };
+
+      const parts = parseInline(line);
 
       if (parts.length === 0) {
         parts.push(<span key={0}>{line}</span>);
@@ -47,6 +60,14 @@ const MarkdownRenderer = ({ content }) => {
       }
 
       // Handle bullet points
+      if (line.startsWith('> ')) {
+        return (
+          <blockquote key={index} className="pl-4 border-l-2 border-lime-400/70 text-white/60 italic mb-3">
+            {parseInline(line.replace(/^>\s+/, ''))}
+          </blockquote>
+        );
+      }
+
       if (line.startsWith('- ') || line.startsWith('* ')) {
         return <p key={index} className="text-white/80 mb-1 ml-4">• {parts.slice(1)}</p>;
       }
