@@ -4,7 +4,6 @@ import { Send, Code, FileText, Sparkles, Loader2, Copy, Check, Mic, Trash2 } fro
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const BettyAI = () => {
   const { user } = useAuth();
