@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const { createClient } = require('redis');
 
 const authRoutes = require('./routes/authRoutes');
 const postRoutes = require('./routes/postRoutes');
@@ -45,6 +47,19 @@ const io = new Server(server, {
   },
   transports: ['polling', 'websocket'],
 });
+
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const pubClient = createClient({ url: redisUrl });
+const subClient = pubClient.duplicate();
+
+Promise.all([pubClient.connect(), subClient.connect()])
+  .then(() => {
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('✅ Socket.IO Redis adapter connected');
+  })
+  .catch((err) => {
+    console.error('⚠️ Socket.IO Redis adapter failed to connect:', err);
+  });
 
 // Make io accessible globally for notification controller
 app.set('io', io);
