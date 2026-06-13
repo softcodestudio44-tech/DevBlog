@@ -10,15 +10,45 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 
+const DM_HISTORY_KEY = 'devblog-dm-history';
+const DM_ACTIVE_USER_KEY = 'devblog-dm-active-user';
+const DM_MESSAGES_KEY = 'devblog-dm-messages';
+
 const Messages = () => {
   const { user, isAuthenticated } = useAuth();
   const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, setTyping, connected } = useSocket();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  const [dmHistory, setDmHistory] = useState([]);
-  const [activeDMUser, setActiveDMUser] = useState(null);
-  const [dmMessages, setDmMessages] = useState([]);
+  const [dmHistory, setDmHistory] = useState(() => {
+    try {
+      const cached = localStorage.getItem(DM_HISTORY_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch (err) {
+      return [];
+    }
+  });
+  const [activeDMUser, setActiveDMUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem(DM_ACTIVE_USER_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch (err) {
+      return null;
+    }
+  });
+  const [dmMessages, setDmMessages] = useState(() => {
+    try {
+      const cachedActive = localStorage.getItem(DM_ACTIVE_USER_KEY);
+      const active = cachedActive ? JSON.parse(cachedActive) : null;
+      if (active?.id) {
+        const cached = localStorage.getItem(`${DM_MESSAGES_KEY}:${active.id}`);
+        return cached ? JSON.parse(cached) : [];
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  });
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -83,13 +113,12 @@ const Messages = () => {
         });
       }
 
-      // Add to active chat if relevant
+      const activeRoomName = activeDMUserRef.current
+        ? `dm:${[user?.id, activeDMUserRef.current.id].sort().join(':')}`
+        : null;
+      if (!activeRoomName || message.roomName !== activeRoomName) return;
+
       setDmMessages(prev => {
-        if (!activeDMUserRef.current) return prev;
-        const isFromActiveUser = message.authorId === activeDMUserRef.current.id;
-        const isToActiveUser = message.authorId === user?.id;
-        if (!isFromActiveUser && !isToActiveUser) return prev;
-        
         const tempIndex = prev.findIndex(m => m.id.startsWith('temp-') && m.authorId === message.authorId && m.content === message.content);
         if (tempIndex >= 0) {
           const updated = [...prev];
@@ -162,6 +191,20 @@ const Messages = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isAuthenticated || !user || activeDMUser || dmHistory.length === 0) return;
+    const cachedActive = localStorage.getItem(DM_ACTIVE_USER_KEY);
+    if (!cachedActive) return;
+    try {
+      const active = JSON.parse(cachedActive);
+      if (active?.id && dmHistory.some(d => d.id === active.id)) {
+        startDM(active);
+      }
+    } catch (err) {
+      console.error('Failed to restore active DM from cache:', err);
+    }
+  }, [isAuthenticated, user, activeDMUser, dmHistory]);
+
   const startDM = async (targetUser) => {
     if (!targetUser || targetUser.id === user?.id) return;
     
@@ -197,6 +240,32 @@ const Messages = () => {
       console.error('Failed to open DM from query params:', err);
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!activeDMUser?.id) return;
+    try {
+      localStorage.setItem(DM_ACTIVE_USER_KEY, JSON.stringify(activeDMUser));
+    } catch (err) {
+      console.error('Failed to save active DM user:', err);
+    }
+  }, [activeDMUser]);
+
+  useEffect(() => {
+    if (!activeDMUser?.id) return;
+    try {
+      localStorage.setItem(`${DM_MESSAGES_KEY}:${activeDMUser.id}`, JSON.stringify(dmMessages));
+    } catch (err) {
+      console.error('Failed to save DM messages:', err);
+    }
+  }, [activeDMUser, dmMessages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DM_HISTORY_KEY, JSON.stringify(dmHistory));
+    } catch (err) {
+      console.error('Failed to save DM history:', err);
+    }
+  }, [dmHistory]);
 
   const handleSend = (e) => {
     e.preventDefault();

@@ -15,7 +15,8 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '');
+    const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || apiUrl || 'http://localhost:5000';
 
     // Close existing socket before creating a new one (so we can
     // re-authenticate whenever login state or token changes)

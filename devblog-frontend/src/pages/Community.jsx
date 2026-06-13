@@ -9,14 +9,35 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 
+const CHANNEL_ROOM_KEY = 'devblog-community-active-room';
+const CHANNEL_MESSAGES_KEY = 'devblog-community-messages';
+
 const Community = () => {
   const { user, isAuthenticated } = useAuth();
   const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping, connected } = useSocket();
   const navigate = useNavigate();
   
   const [rooms, setRooms] = useState([]);
-  const [activeRoom, setActiveRoom] = useState(null);
-  const [channelMessages, setChannelMessages] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(() => {
+    try {
+      const savedId = localStorage.getItem(CHANNEL_ROOM_KEY);
+      return savedId ? { id: savedId } : null;
+    } catch (err) {
+      return null;
+    }
+  });
+  const [channelMessages, setChannelMessages] = useState(() => {
+    try {
+      const savedRoomId = localStorage.getItem(CHANNEL_ROOM_KEY);
+      if (savedRoomId) {
+        const cached = localStorage.getItem(`${CHANNEL_MESSAGES_KEY}:${savedRoomId}`);
+        return cached ? JSON.parse(cached) : [];
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  });
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -31,7 +52,7 @@ const Community = () => {
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
 
-  // Fetch rooms on mount
+  // Fetch rooms on mount and restore last active room
   useEffect(() => {
     fetchRooms();
   }, []);
@@ -105,7 +126,9 @@ const Community = () => {
       const res = await api.get('/chat/rooms');
       setRooms(res.data);
       if (res.data.length > 0) {
-        selectRoom(res.data[0]);
+        const savedRoomId = localStorage.getItem(CHANNEL_ROOM_KEY);
+        const preferredRoom = res.data.find(r => r.id === savedRoomId) || res.data[0];
+        selectRoom(preferredRoom);
       }
       setLoading(false);
     } catch (err) { 
@@ -115,18 +138,40 @@ const Community = () => {
   };
 
   const selectRoom = async (room) => {
-    if (activeRoom) leaveRoom(activeRoom.id);
+    if (!room) return;
+    if (activeRoom && activeRoom.id !== room.id) {
+      try {
+        localStorage.setItem(`${CHANNEL_MESSAGES_KEY}:${activeRoom.id}`, JSON.stringify(channelMessages));
+      } catch (err) {
+        console.error('Failed to cache previous room messages:', err);
+      }
+      leaveRoom(activeRoom.id);
+    }
     setActiveRoom(room);
     setReplyTo(null);
     setShowSidebar(false);
+    localStorage.setItem(CHANNEL_ROOM_KEY, room.id);
     joinRoom(room.id);
     try {
+      const cached = localStorage.getItem(`${CHANNEL_MESSAGES_KEY}:${room.id}`);
+      if (cached) {
+        setChannelMessages(JSON.parse(cached));
+      }
       const res = await api.get(`/chat/rooms/${room.id}/messages`);
       setChannelMessages(res.data || []);
       processedChannelMessagesRef.current.clear();
       res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
     } catch (err) { console.error(err); }
   };
+
+  useEffect(() => {
+    if (!activeRoom?.id) return;
+    try {
+      localStorage.setItem(`${CHANNEL_MESSAGES_KEY}:${activeRoom.id}`, JSON.stringify(channelMessages));
+    } catch (err) {
+      console.error('Failed to save community channel messages:', err);
+    }
+  }, [activeRoom?.id, channelMessages]);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -176,6 +221,7 @@ const Community = () => {
       await api.delete(`/chat/rooms/${activeRoom.id}/clear`);
       setChannelMessages([]);
       processedChannelMessagesRef.current.clear();
+      localStorage.removeItem(`${CHANNEL_MESSAGES_KEY}:${activeRoom.id}`);
     } catch (err) { console.error(err); }
   };
 
