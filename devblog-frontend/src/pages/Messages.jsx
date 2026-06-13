@@ -207,6 +207,13 @@ const Messages = () => {
 
   const startDM = async (targetUser) => {
     if (!targetUser || targetUser.id === user?.id) return;
+
+    if (activeDMUser?.id && activeDMUser.id !== targetUser.id) {
+      // Leave the previous DM room before joining a new one so the socket
+      // doesn't stay subscribed to stale direct-message rooms on reconnect.
+      const previousRoom = `dm:${[user.id, activeDMUser.id].sort().join(':')}`;
+      leaveRoom(previousRoom);
+    }
     
     setActiveDMUser(targetUser);
     setReplyTo(null);

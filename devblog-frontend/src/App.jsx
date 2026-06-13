@@ -25,7 +25,12 @@ function AppContent() {
 
   return (
     <>
-      <div className="app-background" />
+      <div className="app-background">
+        <div className="planet planet-1" />
+        <div className="planet planet-2" />
+        <div className="planet planet-3" />
+        <div className="orbit-ring orbit-1" />
+      </div>
       <CodeParticles />
 
       <div className="min-h-screen flex flex-col relative">

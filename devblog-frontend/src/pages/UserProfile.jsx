@@ -146,15 +146,16 @@ const UserProfile = () => {
         >
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-white/50 hover:text-[#d6e86d] transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to posts
           </Link>
 
           {/* Profile Header */}
-          <GlassCard className="mb-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-emerald-600/30 to-teal-600/30" />
+          <GlassCard className="glass-strong mb-8 relative overflow-hidden profile-panel">
+            <div className="profile-accent-ring" />
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-[#d6e86d]/25 to-transparent" />
 
             <div className="relative pt-16 px-4 pb-6">
               <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
@@ -215,7 +216,7 @@ const UserProfile = () => {
                         className={`flex items-center gap-2 px-5 py-2 rounded-2xl text-sm font-medium transition-all ${
                           profile.isFollowing
                             ? 'bg-white/10 border border-white/10 text-white/60 hover:bg-white/15 hover:text-red-400 hover:border-red-400/30'
-                            : 'bg-lime-500/20 border border-lime-500/30 text-emerald-400 hover:bg-lime-500/30'
+                            : 'bg-[#d6e86d]/18 border border-[#d6e86d]/30 text-[#f6f7d8] hover:bg-[#d6e86d]/25'
                         } disabled:opacity-50`}
                       >
                         {profile.isFollowing ? (
@@ -232,7 +233,7 @@ const UserProfile = () => {
                       </button>
                       <button
                         onClick={() => navigate(`/messages?user=${profile.id}`)}
-                        className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 transition-all"
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium bg-[#d6e86d]/12 border border-[#d6e86d]/20 text-[#f6f7d8] hover:bg-[#d6e86d]/20 transition-all"
                       >
                         <MessageCircle className="w-4 h-4" />
                         Message
@@ -277,14 +278,14 @@ const UserProfile = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
                 <button 
                   onClick={() => setShowModal('following')}
-                  className="text-center bg-white/5 border border-white/10 rounded-3xl py-3 transition-colors hover:bg-white/10 shadow-inner shadow-black/10"
+                  className="text-center bg-[#d6e86d]/08 border border-[#d6e86d]/15 rounded-3xl py-3 transition-colors hover:bg-[#d6e86d]/12 shadow-inner shadow-black/10"
                 >
                   <div className="text-2xl font-bold gradient-text">{profile.followingCount || 0}</div>
                   <div className="text-xs text-white/50">Following</div>
                 </button>
                 <button 
                   onClick={() => setShowModal('followers')}
-                  className="text-center bg-white/5 border border-white/10 rounded-3xl py-3 transition-colors hover:bg-white/10 shadow-inner shadow-black/10"
+                  className="text-center bg-[#d6e86d]/08 border border-[#d6e86d]/15 rounded-3xl py-3 transition-colors hover:bg-[#d6e86d]/12 shadow-inner shadow-black/10"
                 >
                   <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
                   <div className="text-xs text-white/50">Followers</div>
