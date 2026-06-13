@@ -275,6 +275,21 @@ app.post('/api/admin/make-admin', isAdmin, async (req, res) => {
   }
 });
 
+// Stats endpoint for homepage
+app.get('/api/stats', async (req, res) => {
+  try {
+    const [posts, users, likes] = await Promise.all([
+      prisma.post.count(),
+      prisma.user.count(),
+      prisma.like.count(),
+    ]);
+    res.json({ posts, users, likes });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
 // Routes - MUST come after CORS
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
