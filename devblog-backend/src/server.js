@@ -23,9 +23,9 @@ const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
 
 // CORS allowed origins
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'https://devblog-44.vercel.app',
-  'https://dev-blog-woad-seven.vercel.app'
+  'http://localhost:5173',,
+  'https://softcode-devblog.vercel.app', 
+  'https://dev-blog-4bnsqfhgm-softcodestudios-projects.vercel.app'
 ];
 
 // Express CORS - MUST come BEFORE routes
