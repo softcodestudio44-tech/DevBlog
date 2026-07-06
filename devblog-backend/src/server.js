@@ -23,8 +23,8 @@ const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
 
 // CORS allowed origins
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',,
-  'https://softcode-devblog.vercel.app', 
+  'http://localhost:5173',
+  'https://softcode-devblog.vercel.app',
   'https://dev-blog-4bnsqfhgm-softcodestudios-projects.vercel.app'
 ];
 
@@ -291,6 +291,16 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // Routes - MUST come after CORS
+app.get('/api/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', db: 'connected' });
+  } catch (err) {
+    console.error('Health check failed:', err);
+    res.status(500).json({ status: 'error', db: 'disconnected', message: err.message });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/likes', likeRoutes);
