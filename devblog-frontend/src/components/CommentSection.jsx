@@ -52,7 +52,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`${depth > 0 ? 'ml-8 border-l-2 border-lime-500/20 pl-4' : ''}`}
+      className={`${depth > 0 ? 'ml-8 border-l-2 border-primary/20 pl-4' : ''}`}
     >
       <div className="flex gap-3 mb-3">
         <Link to={`/user/${comment.authorId}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
@@ -60,10 +60,10 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
             <img 
               src={comment.author.avatar} 
               alt={comment.author.name || 'User'} 
-              className="w-8 h-8 rounded-full object-cover border border-lime-500/30" 
+              className="w-8 h-8 rounded-full object-cover border border-primary/30" 
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-xs font-bold text-white">
               {comment.author && comment.author.name ? comment.author.name[0] : 'U'}
             </div>
           )}
@@ -71,7 +71,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
         <div className="flex-grow min-w-0">
           <div className="glass p-3 rounded-2xl rounded-tl-none">
             <div className="flex items-center justify-between mb-1">
-              <Link to={`/user/${comment.authorId}`} className="text-sm font-medium text-lime-300 hover:text-white transition-colors truncate">
+              <Link to={`/user/${comment.authorId}`} className="text-sm font-medium text-primary-300 hover:text-white transition-colors truncate">
                 {comment.author && comment.author.name ? comment.author.name : 'Unknown'}
               </Link>
               {canDelete && (
@@ -89,7 +89,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
             {isAuthenticated && (
               <button
                 onClick={() => setReplying(!replying)}
-                className="text-xs text-white hover:text-lime-300 transition-colors flex items-center gap-1"
+                className="text-xs text-white hover:text-primary-300 transition-colors flex items-center gap-1"
               >
                 <CornerDownRight className="w-3 h-3" />
                 Reply
@@ -98,7 +98,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
             {comment.replies && comment.replies.length > 0 && (
               <button
                 onClick={() => setShowReplies(!showReplies)}
-                className="text-xs text-white hover:text-lime-300 transition-colors"
+                className="text-xs text-white hover:text-primary-300 transition-colors"
               >
                 {showReplies ? 'Hide' : 'Show'} {comment.replies.length} replies
               </button>
@@ -117,17 +117,17 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
             className="ml-11 mb-3"
           >
             <div className="flex gap-2">
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 placeholder="Write a reply..."
-                className="input-glass flex-grow text-sm py-2 px-3 text-white placeholder-white/50"
+                className="flex-grow text-sm py-2 px-3 text-white placeholder-white/50 bg-white/[0.04] border border-white/[0.06] rounded-xl focus:outline-none focus:border-primary/30 focus:bg-white/[0.06] transition-all resize-none"
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 autoFocus
               />
               <button
                 type="submit"
-                className="p-2 rounded-xl bg-lime-500/20 text-lime-300 hover:bg-lime-500/30 transition-colors"
+                className="p-2 rounded-xl bg-primary/20 text-primary-300 hover:bg-primary/30 transition-colors"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -173,30 +173,31 @@ const CommentSection = ({ postId, postAuthorId }) => {
     }
   }, [postId]);
 
+  // Socket listener - skip own comments to avoid duplicates
   useEffect(() => {
     if (!socket || !postId) return;
 
     const handleNewComment = (data) => {
-      if (data.postId === postId) {
-        if (data.comment) {
-          setComments((prev) => {
-            // If it's a reply, find parent and add to replies
-            if (data.comment.parentId) {
-              return prev.map((c) => {
-                if (c.id === data.comment.parentId) {
-                  return {
-                    ...c,
-                    replies: [...(c.replies || []), data.comment],
-                  };
-                }
-                return c;
-              });
-            }
-            // Top-level comment
-            if (prev.find((c) => c.id === data.comment.id)) return prev;
-            return [data.comment, ...prev];
-          });
-        }
+      // Skip the current user's comments (they're already added optimistically)
+      if (data.comment && data.comment.authorId === user?.id) return;
+
+      if (data.postId === postId && data.comment) {
+        setComments((prev) => {
+          // If it's a reply, find parent and add to replies
+          if (data.comment.parentId) {
+            return prev.map((c) => {
+              if (c.id === data.comment.parentId) {
+                // Avoid duplicate reply
+                if (c.replies?.find(r => r.id === data.comment.id)) return c;
+                return { ...c, replies: [...(c.replies || []), data.comment] };
+              }
+              return c;
+            });
+          }
+          // Top-level comment - avoid duplicates
+          if (prev.find((c) => c.id === data.comment.id)) return prev;
+          return [data.comment, ...prev];
+        });
       }
     };
 
@@ -213,13 +214,12 @@ const CommentSection = ({ postId, postAuthorId }) => {
       socket.off('new-comment', handleNewComment);
       socket.off('comment-deleted', handleCommentDeleted);
     };
-  }, [socket, postId]);
+  }, [socket, postId, user?.id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    // Optimistically add comment immediately
     const tempId = `temp-${Date.now()}`;
     const optimisticComment = {
       id: tempId,
@@ -237,15 +237,12 @@ const CommentSection = ({ postId, postAuthorId }) => {
     try {
       const response = await api.post(`/posts/${postId}/comments`, { content: optimisticComment.content });
       const realComment = response.data?.comment;
-      
-      // Replace temp comment with real one
       if (realComment) {
         setComments((prev) =>
           prev.map((c) => (c.id === tempId ? { ...realComment, replies: [] } : c))
         );
       }
     } catch (error) {
-      // Remove temp comment on error
       setComments((prev) => prev.filter((c) => c.id !== tempId));
       console.error('Error adding comment:', error);
     } finally {
@@ -256,7 +253,7 @@ const CommentSection = ({ postId, postAuthorId }) => {
   return (
     <div className="mt-8 pt-8 border-t border-white/10">
       <div className="flex items-center gap-2 mb-6">
-        <MessageCircle className="w-5 h-5 text-lime-400 flex-shrink-0" />
+        <MessageCircle className="w-5 h-5 text-primary-400 flex-shrink-0" />
         <h3 className="text-lg font-semibold text-white">
           Comments <span className="text-white text-sm">({comments.length})</span>
         </h3>
@@ -266,18 +263,18 @@ const CommentSection = ({ postId, postAuthorId }) => {
         <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
           <Link to={`/user/${user ? user.id : ''}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
             {user && user.avatar ? (
-              <img src={user.avatar} alt={user.name || 'User'} className="w-8 h-8 rounded-full object-cover border border-lime-500/30" />
+              <img src={user.avatar} alt={user.name || 'User'} className="w-8 h-8 rounded-full object-cover border border-primary/30" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-xs font-bold text-white">
                 {user && user.name ? user.name[0] : 'U'}
               </div>
             )}
           </Link>
           <div className="flex-grow flex gap-2 min-w-0">
-            <input
-              type="text"
+            <textarea
+              rows={2}
               placeholder="Add a comment..."
-              className="input-glass flex-grow min-w-0 text-white placeholder-white/50"
+              className="flex-grow min-w-0 text-white placeholder-white/50 bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2 focus:outline-none focus:border-primary/30 focus:bg-white/[0.06] transition-all resize-none"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
             />
@@ -292,7 +289,7 @@ const CommentSection = ({ postId, postAuthorId }) => {
         </form>
       ) : (
         <div className="glass p-4 text-center mb-6 text-white text-sm">
-          Please <Link to="/login" className="text-lime-400 hover:underline">login</Link> to comment
+          Please <Link to="/login" className="text-primary-400 hover:underline">login</Link> to comment
         </div>
       )}
 

@@ -6,7 +6,7 @@ const AnimatedButton = ({ children, onClick, className = '' }) => {
       onClick={onClick}
       className={`relative overflow-hidden group ${className}`}
     >
-      <span className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <span className="absolute inset-0 bg-gradient-to-r from-primary-500/20 to-primary-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       <span className="relative">{children}</span>
     </button>
   );

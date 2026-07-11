@@ -22,14 +22,12 @@ const Navbar = () => {
     if (!socket) return;
 
     const handleNewDM = (message) => {
-      // Only count if not from self and not on messages page
       if (message.authorId !== user?.id && location.pathname !== '/messages') {
         setMessageCount(prev => prev + 1);
       }
     };
 
     const handleNewChannelMessage = (message) => {
-      // Only count if not from self and not on community page
       if (message.authorId !== user?.id && location.pathname !== '/community') {
         setCommunityCount(prev => prev + 1);
       }
@@ -44,7 +42,6 @@ const Navbar = () => {
     };
   }, [socket, location.pathname, user]);
 
-  // Reset badges when visiting the page
   useEffect(() => {
     if (location.pathname === '/messages') setMessageCount(0);
     if (location.pathname === '/community') setCommunityCount(0);
@@ -83,20 +80,13 @@ const Navbar = () => {
                 src="/logo.png?v=3" 
                 alt="DevBlog" 
                 className="w-8 h-8 rounded-lg object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
               />
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-lime-400 to-lime-600 flex items-center justify-center hidden">
-                <span className="text-white font-bold text-xs">DB</span>
-              </div>
               <div className="hidden sm:block">
-                <span className="text-base font-bold text-lime-400">DevBlog</span>
+                <span className="text-base font-bold text-primary-400">DevBlog</span>
                 {isAdmin && (
                   <div className="flex items-center gap-1">
-                    <Shield className="w-2.5 h-2.5 text-lime-400" />
-                    <span className="text-[9px] text-lime-400 uppercase tracking-wider">Admin</span>
+                    <Shield className="w-2.5 h-2.5 text-primary-400" />
+                    <span className="text-[9px] text-primary-400 uppercase tracking-wider">Admin</span>
                   </div>
                 )}
               </div>
@@ -110,8 +100,8 @@ const Navbar = () => {
                 to={item.to}
                 className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
                   isActive(item.to)
-                    ? 'bg-lime-500/[0.08] text-lime-300 border border-lime-500/15'
-                    : 'text-white hover:text-lime-300 hover:bg-white/[0.02]'
+                    ? 'bg-primary/[0.08] text-primary-300 border border-primary/15'
+                    : 'text-white hover:text-primary-300 hover:bg-white/[0.02]'
                 }`}
               >
                 <item.icon className="w-4 h-4" />
@@ -128,8 +118,8 @@ const Navbar = () => {
                 to="/create"
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-all ${
                   isActive('/create')
-                    ? 'bg-lime-500/[0.08] text-lime-300 border border-lime-500/15'
-                    : 'text-white hover:text-lime-300 hover:bg-white/[0.02]'
+                    ? 'bg-primary/[0.08] text-primary-300 border border-primary/15'
+                    : 'text-white hover:text-primary-300 hover:bg-white/[0.02]'
                 }`}
               >
                 <PenLine className="w-4 h-4" />
@@ -147,10 +137,10 @@ const Navbar = () => {
                     <img 
                       src={user.avatar} 
                       alt={user.name} 
-                      className="w-8 h-8 rounded-full object-cover ring-2 ring-lime-500/20 group-hover:ring-lime-500/40 transition-all" 
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20/20 group-hover:ring-primary/40 transition-all" 
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white ring-2 ring-lime-500/20">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center text-xs font-bold text-white ring-2 ring-primary/20/20">
                       {user?.name?.[0] || 'U'}
                     </div>
                   )}
@@ -165,10 +155,10 @@ const Navbar = () => {
               </>
             ) : (
               <div className="flex items-center gap-2">
-                <Link to="/login" className="px-3 py-2 rounded-xl text-sm text-white hover:text-lime-300 hover:bg-white/[0.02] transition-all">
+                <Link to="/login" className="px-3 py-2 rounded-xl text-sm text-white hover:text-primary-300 hover:bg-white/[0.02] transition-all">
                   Login
                 </Link>
-                <Link to="/register" className="px-3 py-2 rounded-xl text-sm bg-lime-500/[0.06] border border-lime-500/15 text-lime-300 hover:bg-lime-500/[0.1] transition-all">
+                <Link to="/register" className="px-3 py-2 rounded-xl text-sm bg-primary/[0.06] border border-primary/15 text-primary-300 hover:bg-primary/[0.1] transition-all">
                   Join
                 </Link>
               </div>
@@ -192,28 +182,21 @@ const Navbar = () => {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] z-50 bg-[#0a0f0d]/98 backdrop-blur-xl border-r border-lime-500/10 flex flex-col"
+              className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] z-50 bg-[#0a0f0d]/98 backdrop-blur-xl border-r border-primary/10 flex flex-col"
             >
-              <div className="p-5 border-b border-lime-500/10 flex items-center justify-between">
+              <div className="p-5 border-b border-primary/10 flex items-center justify-between">
                 <Link to="/" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
                   <img 
                     src="/logo.png?v=3" 
                     alt="DevBlog" 
                     className="w-10 h-10 rounded-xl object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
                   />
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-400 to-lime-600 flex items-center justify-center hidden">
-                    <span className="text-white font-bold text-sm">DB</span>
-                  </div>
                   <div>
-                    <span className="text-lg font-bold text-lime-400">DevBlog</span>
+                    <span className="text-lg font-bold text-primary-400">DevBlog</span>
                     {isAdmin && (
                       <div className="flex items-center gap-1 mt-0.5">
-                        <Shield className="w-3 h-3 text-lime-400" />
-                        <span className="text-[10px] text-lime-400 uppercase">Admin</span>
+                        <Shield className="w-3 h-3 text-primary-400" />
+                        <span className="text-[10px] text-primary-400 uppercase">Admin</span>
                       </div>
                     )}
                   </div>
@@ -235,8 +218,8 @@ const Navbar = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`relative flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all ${
                       isActive(item.to)
-                        ? 'bg-lime-500/[0.08] text-lime-300 border border-lime-500/15'
-                        : 'text-white hover:text-lime-300 hover:bg-white/[0.02]'
+                        ? 'bg-primary/[0.08] text-primary-300 border border-primary/15'
+                        : 'text-white hover:text-primary-300 hover:bg-white/[0.02]'
                     }`}
                   >
                     <item.icon className="w-5 h-5" />
@@ -254,8 +237,8 @@ const Navbar = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all mt-2 ${
                       isActive('/create')
-                        ? 'bg-lime-500/[0.08] text-lime-300 border border-lime-500/15'
-                        : 'text-white hover:text-lime-300 hover:bg-white/[0.02]'
+                        ? 'bg-primary/[0.08] text-primary-300 border border-primary/15'
+                        : 'text-white hover:text-primary-300 hover:bg-white/[0.02]'
                     }`}
                   >
                     <PenLine className="w-5 h-5" />
@@ -269,7 +252,7 @@ const Navbar = () => {
                     <Link
                       to={`/user/${user?.id}`}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-white hover:text-lime-300 hover:bg-white/[0.02] transition-all"
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-white hover:text-primary-300 hover:bg-white/[0.02] transition-all"
                     >
                       <User className="w-5 h-5" />
                       <span className="text-sm font-medium">Profile</span>
@@ -287,7 +270,7 @@ const Navbar = () => {
                     <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="block text-center py-3 rounded-xl text-white border border-white/[0.05]">
                       Login
                     </Link>
-                    <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="block text-center py-3 rounded-xl bg-lime-500/[0.08] text-lime-300 border border-lime-500/15">
+                    <Link to="/register" onClick={() => setMobileMenuOpen(false)} className="block text-center py-3 rounded-xl bg-primary/[0.08] text-primary-300 border border-primary/15">
                       Join DevBlog
                     </Link>
                   </div>

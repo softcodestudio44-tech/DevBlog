@@ -25,7 +25,7 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
     if (!socket || !postId) return;
 
     const handlePostLiked = (data) => {
-      if (data.postId === postId && data.userId !== 'me') {
+      if (data.postId === postId && data.userId !== user?.id) {
         // Only update count from socket if it's NOT our own action
         setCount((prev) =>
           data.action === 'like' ? prev + 1 : Math.max(0, prev - 1)

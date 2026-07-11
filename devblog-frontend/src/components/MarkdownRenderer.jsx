@@ -62,7 +62,7 @@ const MarkdownRenderer = ({ content }) => {
       // Handle bullet points
       if (line.startsWith('> ')) {
         return (
-          <blockquote key={index} className="pl-4 border-l-2 border-lime-400/70 text-white/60 italic mb-3">
+          <blockquote key={index} className="pl-4 border-l-2 border-primary-400/70 text-white/60 italic mb-3">
             {parseInline(line.replace(/^>\s+/, ''))}
           </blockquote>
         );

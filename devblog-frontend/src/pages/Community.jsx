@@ -52,12 +52,10 @@ const Community = () => {
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
 
-  // Fetch rooms on mount and restore last active room
   useEffect(() => {
     fetchRooms();
   }, []);
 
-  // Socket listeners for community
   useEffect(() => {
     if (!socket) return;
 
@@ -96,7 +94,6 @@ const Community = () => {
     };
   }, [socket, activeRoom]);
 
-  // Refresh messages on reconnect
   useEffect(() => {
     if (!socket || !connected || !activeRoom) return;
     
@@ -114,7 +111,6 @@ const Community = () => {
     refreshMessages();
   }, [connected, activeRoom]);
 
-  // Auto-scroll
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
@@ -172,6 +168,10 @@ const Community = () => {
       console.error('Failed to save community channel messages:', err);
     }
   }, [activeRoom?.id, channelMessages]);
+
+  const toggleSidebar = () => {
+    setShowSidebar(prev => !prev);
+  };
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -239,7 +239,7 @@ const Community = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#030405]">
-        <div className="w-10 h-10 rounded-full border-2 border-lime-500/20 border-t-lime-400 animate-spin" />
+        <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-blue-400 animate-spin" />
       </div>
     );
   }
@@ -248,10 +248,10 @@ const Community = () => {
     <div className="flex h-[calc(100vh-64px)] bg-[#030405] overflow-hidden relative">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-lime-500/[0.03] blur-3xl animate-pulse" style={{animationDuration: '8s'}} />
-        <div className="absolute bottom-[15%] left-[5%] w-[350px] h-[350px] rounded-full bg-teal-500/[0.02] blur-3xl animate-pulse" style={{animationDuration: '12s'}} />
-        <div className="absolute top-[35%] left-[25%] w-[180px] h-[180px] rounded-full bg-lime-400/[0.02] blur-2xl animate-pulse" style={{animationDuration: '6s'}} />
-        <div className="absolute top-[60%] right-[30%] w-[250px] h-[250px] rounded-full bg-purple-500/[0.015] blur-3xl animate-pulse" style={{animationDuration: '10s'}} />
+        <div className="absolute top-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-primary/[0.03] blur-3xl animate-pulse" style={{animationDuration: '8s'}} />
+        <div className="absolute bottom-[15%] left-[5%] w-[350px] h-[350px] rounded-full bg-primary/[0.02] blur-3xl animate-pulse" style={{animationDuration: '12s'}} />
+        <div className="absolute top-[35%] left-[25%] w-[180px] h-[180px] rounded-full bg-primary-400/[0.02] blur-2xl animate-pulse" style={{animationDuration: '6s'}} />
+        <div className="absolute top-[60%] right-[30%] w-[250px] h-[250px] rounded-full bg-primary/[0.015] blur-3xl animate-pulse" style={{animationDuration: '10s'}} />
         
         <div className="code-particle" style={{left: '8%', animationDelay: '0s', animationDuration: '18s'}}>{'{ }'}</div>
         <div className="code-particle" style={{left: '22%', animationDelay: '3s', animationDuration: '22s'}}>{'</>'}</div>
@@ -266,11 +266,12 @@ const Community = () => {
         
         <div className="absolute top-[10%] left-[15%] w-1 h-1 rounded-full bg-white/20 animate-pulse" />
         <div className="absolute top-[25%] left-[60%] w-0.5 h-0.5 rounded-full bg-white/30 animate-pulse" style={{animationDelay: '1s'}} />
-        <div className="absolute top-[45%] left-[80%] w-1 h-1 rounded-full bg-lime-400/20 animate-pulse" style={{animationDelay: '2s'}} />
+        <div className="absolute top-[45%] left-[80%] w-1 h-1 rounded-full bg-primary-400/20 animate-pulse" style={{animationDelay: '2s'}} />
         <div className="absolute top-[70%] left-[20%] w-0.5 h-0.5 rounded-full bg-white/25 animate-pulse" style={{animationDelay: '3s'}} />
-        <div className="absolute top-[85%] left-[50%] w-1 h-1 rounded-full bg-teal-400/20 animate-pulse" style={{animationDelay: '1.5s'}} />
+        <div className="absolute top-[85%] left-[50%] w-1 h-1 rounded-full bg-primary-400/20 animate-pulse" style={{animationDelay: '1.5s'}} />
       </div>
 
+      {/* Mobile overlay for sidebar */}
       {showSidebar && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowSidebar(false)} />}
 
       {/* Sidebar */}
@@ -281,7 +282,7 @@ const Community = () => {
         ${showSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="lg:hidden p-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
-          <h2 className="font-bold text-white text-sm">Community</h2>
+          <h2 className="font-bold text-white text-sm">Channels</h2>
           <button onClick={() => setShowSidebar(false)} className="p-2 rounded-lg hover:bg-white/5 text-white/30">
             <X className="w-5 h-5" />
           </button>
@@ -291,7 +292,7 @@ const Community = () => {
           <div className="p-4 mb-4 rounded-3xl bg-[#081114]/95 border border-slate-700/30 shadow-inner shadow-black/20">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-900/20">
-                <Users className="w-5 h-5 text-lime-300" />
+                <Users className="w-5 h-5 text-primary-300" />
               </div>
               <div>
                 <h2 className="font-bold text-white text-sm">Channel list</h2>
@@ -303,7 +304,7 @@ const Community = () => {
               <input
                 type="text"
                 placeholder="Search channels..."
-                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-lime-500/30"
+                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/30"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -318,13 +319,13 @@ const Community = () => {
                 onClick={() => selectRoom(room)}
                 className={`w-full text-left p-3 rounded-xl transition-all ${
                   activeRoom?.id === room.id
-                    ? 'bg-lime-500/10 border border-lime-500/20'
+                    ? 'bg-primary/10 border border-primary/20'
                     : 'hover:bg-white/[0.02] border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    activeRoom?.id === room.id ? 'bg-lime-500/15 text-lime-400' : 'bg-white/5 text-white/30'
+                    activeRoom?.id === room.id ? 'bg-primary/15 text-primary-400' : 'bg-white/5 text-white/30'
                   }`}>
                     <Hash className="w-5 h-5" />
                   </div>
@@ -351,7 +352,7 @@ const Community = () => {
                   {u.avatar ? (
                     <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-900" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-slate-900">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-slate-900">
                       {u.name?.[0]}
                     </div>
                   )}
@@ -378,20 +379,23 @@ const Community = () => {
         {/* Header */}
         {activeRoom && (
           <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
-            <button onClick={() => setShowSidebar(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50">
+            <button 
+              onClick={toggleSidebar} 
+              className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50"
+            >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="w-10 h-10 rounded-xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center">
-              <Hash className="w-5 h-5 text-lime-400" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Hash className="w-5 h-5 text-primary-400" />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold text-white text-sm">{activeRoom.name}</h3>
               <p className="text-xs text-white/40 truncate">{activeRoom.topic}</p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lime-500/5 border border-lime-500/10">
-                <Users className="w-3.5 h-3.5 text-lime-400/60" />
-                <span className="text-xs text-lime-400/60">{onlineUsers.length} online</span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10">
+                <Users className="w-3.5 h-3.5 text-primary-400/60" />
+                <span className="text-xs text-primary-400/60">{onlineUsers.length} online</span>
               </div>
               {isAdmin && (
                 <button onClick={handleClearChat} className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" title="Clear chat">
@@ -419,8 +423,8 @@ const Community = () => {
             
             {channelMessages.length === 0 && activeRoom && (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-20 h-20 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center justify-center mb-4">
-                  <Hash className="w-10 h-10 text-lime-400/20" />
+                <div className="w-20 h-20 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center mb-4">
+                  <Hash className="w-10 h-10 text-primary-400/20" />
                 </div>
                 <p className="text-sm text-white/40 font-medium">Welcome to #{activeRoom.name}</p>
                 <p className="text-xs text-white/25 mt-1">This is the start of the channel.</p>
@@ -443,14 +447,14 @@ const Community = () => {
                           {msg.author?.avatar ? (
                             <img src={msg.author.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
                           ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center text-xs font-bold text-white">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center text-xs font-bold text-white">
                               {msg.author?.name?.[0] || 'U'}
                             </div>
                           )}
                         </Link>
                         <div className="min-w-0">
                           <div className="flex items-baseline gap-2 mb-0.5">
-                            <Link to={`/user/${msg.authorId}`} className="text-sm font-semibold text-lime-300/80 hover:text-lime-300 hover:underline truncate">
+                            <Link to={`/user/${msg.authorId}`} className="text-sm font-semibold text-primary-300/80 hover:text-primary-300 hover:underline truncate">
                               {msg.author?.name}
                             </Link>
                             <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
@@ -459,10 +463,9 @@ const Community = () => {
                       </div>
                     )}
                     <div className="relative">
-                      <div className={`px-4 py-3 rounded-3xl backdrop-blur-xl ${isOwn ? 'bg-lime-500/25 text-white rounded-br-sm' : 'bg-white/10 text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
+                      <div className={`px-4 py-3 rounded-3xl backdrop-blur-xl ${isOwn ? 'bg-primary/25 text-white rounded-br-sm' : 'bg-white/10 text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
                         <MarkdownRenderer content={msg.content} />
                       </div>
-                      {/* HOVER ACTION BUTTONS - SAME AS YOUR SCREENSHOT */}
                       <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
                           <CornerUpLeft className="w-4 h-4" />
@@ -481,7 +484,7 @@ const Community = () => {
             
             {currentTyping.length > 0 && (
               <div className="flex gap-3 mt-4 pl-1">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-lime-700 to-teal-800 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0">
                   <Users className="w-4 h-4 text-white" />
                 </div>
                 <div className="glass px-4 py-2.5 rounded-2xl rounded-tl-sm">
@@ -499,7 +502,6 @@ const Community = () => {
         {/* Input */}
         {isAuthenticated ? (
           <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
-            {/* REPLY PREVIEW - SAME AS YOUR SCREENSHOT */}
             {replyTo && (
               <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5">
                 <div className="flex items-start justify-between gap-3">
@@ -522,7 +524,7 @@ const Community = () => {
                   ref={inputRef}
                   type="text"
                   placeholder={activeRoom ? `Message #${activeRoom.name}...` : 'Select a channel...'}
-                  className="w-full bg-white/[0.04] border border-white/[0.06] rounded-full px-5 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-lime-500/30 focus:bg-white/[0.06] transition-all"
+                  className="w-full bg-white/[0.04] border border-white/[0.06] rounded-full px-5 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/30 focus:bg-white/[0.06] transition-all"
                   value={newMessage}
                   onChange={handleTyping}
                   disabled={!activeRoom}
@@ -531,7 +533,7 @@ const Community = () => {
               <button
                 type="submit"
                 disabled={!newMessage.trim() || !activeRoom}
-                className="w-11 h-11 rounded-full bg-lime-500 flex items-center justify-center hover:bg-lime-400 transition-all disabled:opacity-20 disabled:hover:bg-lime-500 shadow-lg shadow-lime-500/20 flex-shrink-0"
+                className="w-11 h-11 rounded-full bg-primary flex items-center justify-center hover:bg-primary-400 transition-all disabled:opacity-20 disabled:hover:bg-primary shadow-lg shadow-blue-500/20 flex-shrink-0"
               >
                 <Send className="w-5 h-5 text-white" />
               </button>
@@ -539,7 +541,7 @@ const Community = () => {
           </div>
         ) : (
           <div className="p-4 border-t border-white/5 text-center text-white/30 text-sm">
-            Please <a href="/login" className="text-lime-400 hover:underline">login</a> to join.
+            Please <a href="/login" className="text-primary-400 hover:underline">login</a> to join.
           </div>
         )}
       </div>

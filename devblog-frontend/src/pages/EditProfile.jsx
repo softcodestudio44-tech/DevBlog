@@ -117,7 +117,7 @@ const EditProfile = () => {
         >
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
+            className="flex items-center gap-2 text-white/50 hover:text-primary-300 transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -145,10 +145,10 @@ const EditProfile = () => {
                 <img
                   src={previewUrl || formData.avatar}
                   alt="Avatar"
-                  className="w-24 h-24 rounded-2xl object-cover border-2 border-emerald-500/30"
+                  className="w-24 h-24 rounded-2xl object-cover border-2 border-primary-500/30"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-3xl font-bold text-white">
+                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary-500 to-blue-600 flex items-center justify-center text-3xl font-bold text-white">
                   {formData.name?.[0] || 'U'}
                 </div>
               )}
@@ -165,7 +165,7 @@ const EditProfile = () => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadLoading}
-                className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center hover:bg-emerald-400 transition-colors disabled:opacity-50 shadow-lg shadow-emerald-500/30"
+                className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center hover:bg-primary-400 transition-colors disabled:opacity-50 shadow-lg shadow-primary-500/30"
               >
                 {uploadLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -188,7 +188,7 @@ const EditProfile = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadLoading}
-              className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
+              className="text-sm text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-2 mx-auto disabled:opacity-50"
             >
               <Upload className="w-4 h-4" />
               {uploadLoading ? 'Uploading...' : 'Upload your own photo'}
@@ -209,8 +209,8 @@ const EditProfile = () => {
                   }}
                   className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
                     formData.avatar === avatar
-                      ? 'border-emerald-400 shadow-lg shadow-emerald-500/30'
-                      : 'border-white/10 hover:border-emerald-500/50'
+                      ? 'border-primary-400 shadow-lg shadow-primary-500/30'
+                      : 'border-white/10 hover:border-primary-500/50'
                   }`}
                 >
                   <img src={avatar} alt={`Avatar ${i + 1}`} className="w-full h-full object-cover" />
@@ -223,8 +223,8 @@ const EditProfile = () => {
                 }}
                 className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all ${
                   !formData.avatar
-                    ? 'border-emerald-400 shadow-lg shadow-emerald-500/30'
-                    : 'border-white/10 hover:border-emerald-500/50'
+                    ? 'border-primary-400 shadow-lg shadow-primary-500/30'
+                    : 'border-white/10 hover:border-primary-500/50'
                 }`}
               >
                 <User className="w-6 h-6 text-white/50" />
@@ -261,7 +261,7 @@ const EditProfile = () => {
               <div className="space-y-4">
                 {socialInputs.map(({ key, label, icon: Icon, placeholder }) => (
                   <div key={key}>
-                    <label className="block text-sm font-medium mb-2 text-white/50 flex items-center gap-2">
+                    <label className="text-sm font-medium mb-2 text-white/50 flex items-center gap-2">
                       <Icon className="w-4 h-4" />
                       {label}
                     </label>
@@ -283,7 +283,7 @@ const EditProfile = () => {
               className="btn-neon w-full flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-primary-300 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
                   <Save className="w-4 h-4" />

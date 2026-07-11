@@ -76,18 +76,24 @@ const BettyAI = () => {
     requestAnimationFrame(() => scrollToBottom());
 
     try {
+      // Build conversation history from previous messages (last 20)
+      const conversationHistory = messages
+        .filter(m => m.id !== 'welcome')
+        .slice(-20)
+        .map(m => ({ from: m.from, text: m.text }));
+
       let endpoint = '/ai/chat';
-      let body = { message: input, context: mode };
+      let body = { message: input, context: mode, history: conversationHistory };
 
       if (mode === 'explain') {
         endpoint = '/ai/explain';
-        body = { code: input, language: 'javascript' };
+        body = { code: input, language: 'javascript', history: conversationHistory };
       } else if (mode === 'summarize') {
         endpoint = '/ai/summarize';
         body = { content: input };
       } else if (mode === 'write') {
         endpoint = '/ai/write';
-        body = { topic: input, type: 'blog post' };
+        body = { topic: input, type: 'blog post', history: conversationHistory };
       }
 
       const response = await api.post(endpoint, body);
@@ -148,7 +154,7 @@ const BettyAI = () => {
     <div className="fixed inset-0 flex flex-col" style={{ background: '#050608', height: '100vh' }}>
       {/* Subtle ambient glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-emerald-500/[0.025] rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-primary/[0.025] rounded-full blur-3xl" />
       </div>
 
       {/* Header */}
@@ -157,16 +163,16 @@ const BettyAI = () => {
           <div className="flex items-center gap-4">
             {/* Betty Avatar */}
             <div className="relative">
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary-400 via-primary to-primary-600 flex items-center justify-center shadow-lg shadow-primary/20">
                 <span className="text-white font-bold text-lg">B</span>
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#050608] rounded-full" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-primary-400 border-2 border-[#050608] rounded-full" />
             </div>
             <div>
               <h2 className="font-bold text-white text-base">Betty AI</h2>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <p className="text-[11px] text-emerald-400/50">Online</p>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" />
+                <p className="text-[11px] text-primary-400/50">Online</p>
               </div>
             </div>
           </div>
@@ -189,7 +195,7 @@ const BettyAI = () => {
                   onClick={() => setMode(m.id)}
                   className={`px-3 py-1.5 rounded-lg text-[11px] transition-all ${
                     mode === m.id
-                      ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                      ? 'bg-primary/10 text-primary-300 border border-primary/20'
                       : 'text-white/20 hover:text-white/40 hover:bg-white/[0.02]'
                   }`}
                 >
@@ -220,11 +226,11 @@ const BettyAI = () => {
                 {/* Avatar */}
                 <div className="flex-shrink-0">
                   {msg.from === 'betty' ? (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/15">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 via-primary to-primary-600 flex items-center justify-center shadow-lg shadow-primary/15">
                       <span className="text-white font-bold">B</span>
                     </div>
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-700 to-teal-800 flex items-center justify-center text-sm font-bold text-white">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-700 to-primary-800 flex items-center justify-center text-sm font-bold text-white">
                       {user?.name?.[0] || 'U'}
                     </div>
                   )}
@@ -256,7 +262,7 @@ const BettyAI = () => {
                         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-lg hover:bg-white/5"
                       >
                         {copiedId === msg.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <Check className="w-3.5 h-3.5 text-primary-400" />
                         ) : (
                           <Copy className="w-3.5 h-3.5 text-white/20" />
                         )}
@@ -275,7 +281,7 @@ const BettyAI = () => {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-4"
             >
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/15">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 via-primary to-primary-600 flex items-center justify-center shadow-lg shadow-primary/15">
                 <span className="text-white font-bold text-sm">B</span>
               </div>
               <div className="message-bot p-4">
@@ -295,21 +301,27 @@ const BettyAI = () => {
         <div className="max-w-3xl mx-auto">
           <form onSubmit={handleSend} className="flex items-end gap-3">
             <div className="flex-1 relative">
-              <input
-                type="text"
+              <textarea
+                rows={2}
                 placeholder={
                   mode === 'explain' ? 'Paste your code here...' :
                   mode === 'summarize' ? 'Paste article text...' :
                   mode === 'write' ? 'What should I write about?' :
                   'Ask Betty anything...'
                 }
-                className="input-glass pr-12 py-3.5"
+                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-3.5 pr-12 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/30 focus:bg-white/[0.06] transition-all resize-none"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend(e);
+                  }
+                }}
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/[0.03] transition-colors text-white/15 hover:text-emerald-400/60"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/[0.03] transition-colors text-white/15 hover:text-primary-400/60"
               >
                 <Mic className="w-4 h-4" />
               </button>
@@ -318,7 +330,7 @@ const BettyAI = () => {
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-15 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/15"
+              className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center hover:from-primary-400 hover:to-primary transition-all disabled:opacity-15 disabled:cursor-not-allowed shadow-lg shadow-primary/15"
             >
               <Send className="w-5 h-5 text-white" />
             </button>

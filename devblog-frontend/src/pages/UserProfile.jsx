@@ -106,10 +106,10 @@ const UserProfile = () => {
   const socialLinks = [
     { key: 'github', label: 'GitHub', icon: Github, color: 'hover:text-white' },
     { key: 'twitter', label: 'Twitter', icon: Twitter, color: 'hover:text-sky-400' },
-    { key: 'linkedin', label: 'LinkedIn', icon: Linkedin, color: 'hover:text-blue-400' },
+    { key: 'linkedin', label: 'LinkedIn', icon: Linkedin, color: 'hover:text-primary-400' },
     { key: 'tiktok', label: 'TikTok', icon: Music2, color: 'hover:text-pink-400' },
     { key: 'facebook', label: 'Facebook', icon: Facebook, color: 'hover:text-blue-500' },
-    { key: 'website', label: 'Website', icon: Globe, color: 'hover:text-emerald-400' },
+    { key: 'website', label: 'Website', icon: Globe, color: 'hover:text-primary-400' },
   ];
 
   if (loading) {
@@ -127,7 +127,7 @@ const UserProfile = () => {
       <div className="min-h-screen pt-24 px-4 flex items-center justify-center">
         <GlassCard className="text-center py-12">
           <p className="text-white/60 text-lg">User not found</p>
-          <Link to="/" className="text-emerald-400 hover:underline mt-4 inline-block">
+          <Link to="/" className="text-primary-400 hover:underline mt-4 inline-block">
             Go back home
           </Link>
         </GlassCard>
@@ -146,7 +146,7 @@ const UserProfile = () => {
         >
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-[#d6e86d] transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-white/50 hover:text-[#3B82F6] transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to posts
@@ -155,7 +155,7 @@ const UserProfile = () => {
           {/* Profile Header */}
           <GlassCard className="glass-strong mb-8 relative overflow-hidden profile-panel">
             <div className="profile-accent-ring" />
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-[#d6e86d]/25 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-[#3B82F6]/25 to-transparent" />
 
             <div className="relative pt-16 px-4 pb-6">
               <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
@@ -173,11 +173,11 @@ const UserProfile = () => {
                     />
                   ) : null}
                   <div 
-                    className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0F0A1E] shadow-2xl ${profile.avatar ? 'hidden' : ''}`}
+                    className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-primary to-primary-400 flex items-center justify-center text-4xl font-bold text-white border-4 border-[#0F0A1E] shadow-2xl ${profile.avatar ? 'hidden' : ''}`}
                   >
                     {profile.name && profile.name[0] ? profile.name[0] : 'U'}
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-green-500 border-4 border-[#0F0A1E]" />
+                  <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-primary border-4 border-[#0F0A1E]" />
                 </div>
 
                 {/* Info */}
@@ -187,7 +187,7 @@ const UserProfile = () => {
 
                     {/* Admin Badge */}
                     {profile.isAdmin && (
-                      <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+                      <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/20 border border-primary/30 text-primary-400 text-xs font-medium">
                         <Shield className="w-3 h-3" />
                         ADMIN
                       </span>
@@ -196,9 +196,9 @@ const UserProfile = () => {
                     {isOwnProfile && (
                       <Link
                         to="/edit-profile"
-                        className="p-2 rounded-xl glass hover:bg-emerald-500/20 transition-colors"
+                        className="p-2 rounded-xl glass hover:bg-primary/20 transition-colors"
                       >
-                        <Edit3 className="w-4 h-4 text-emerald-300" />
+                        <Edit3 className="w-4 h-4 text-primary-300" />
                       </Link>
                     )}
                   </div>
@@ -216,7 +216,7 @@ const UserProfile = () => {
                         className={`flex items-center gap-2 px-5 py-2 rounded-2xl text-sm font-medium transition-all ${
                           profile.isFollowing
                             ? 'bg-white/10 border border-white/10 text-white/60 hover:bg-white/15 hover:text-red-400 hover:border-red-400/30'
-                            : 'bg-[#d6e86d]/18 border border-[#d6e86d]/30 text-[#f6f7d8] hover:bg-[#d6e86d]/25'
+                            : 'bg-[#3B82F6]/18 border border-[#3B82F6]/30 text-[#DBEAFE] hover:bg-[#3B82F6]/25'
                         } disabled:opacity-50`}
                       >
                         {profile.isFollowing ? (
@@ -233,7 +233,7 @@ const UserProfile = () => {
                       </button>
                       <button
                         onClick={() => navigate(`/messages?user=${profile.id}`)}
-                        className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium bg-[#d6e86d]/12 border border-[#d6e86d]/20 text-[#f6f7d8] hover:bg-[#d6e86d]/20 transition-all"
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium bg-[#3B82F6]/12 border border-[#3B82F6]/20 text-[#DBEAFE] hover:bg-[#3B82F6]/20 transition-all"
                       >
                         <MessageCircle className="w-4 h-4" />
                         Message
@@ -278,14 +278,14 @@ const UserProfile = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
                 <button 
                   onClick={() => setShowModal('following')}
-                  className="text-center bg-[#d6e86d]/08 border border-[#d6e86d]/15 rounded-3xl py-3 transition-colors hover:bg-[#d6e86d]/12 shadow-inner shadow-black/10"
+                  className="text-center bg-[#3B82F6]/08 border border-[#3B82F6]/15 rounded-3xl py-3 transition-colors hover:bg-[#3B82F6]/12 shadow-inner shadow-black/10"
                 >
                   <div className="text-2xl font-bold gradient-text">{profile.followingCount || 0}</div>
                   <div className="text-xs text-white/50">Following</div>
                 </button>
                 <button 
                   onClick={() => setShowModal('followers')}
-                  className="text-center bg-[#d6e86d]/08 border border-[#d6e86d]/15 rounded-3xl py-3 transition-colors hover:bg-[#d6e86d]/12 shadow-inner shadow-black/10"
+                  className="text-center bg-[#3B82F6]/08 border border-[#3B82F6]/15 rounded-3xl py-3 transition-colors hover:bg-[#3B82F6]/12 shadow-inner shadow-black/10"
                 >
                   <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
                   <div className="text-xs text-white/50">Followers</div>
@@ -322,7 +322,7 @@ const UserProfile = () => {
               {posts.map((post, index) => (
                 <GlassCard key={post.id} delay={index * 0.1}>
                   <Link to={`/post/${post.id}`}>
-                    <h3 className="text-lg font-semibold mb-2 hover:text-emerald-300 transition-colors">
+                    <h3 className="text-lg font-semibold mb-2 hover:text-primary-300 transition-colors">
                       {post.title}
                     </h3>
                   </Link>
@@ -407,7 +407,7 @@ const UserProfile = () => {
                             className="w-10 h-10 rounded-full object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-sm font-bold text-white">
                             {follower.name && follower.name[0] ? follower.name[0] : 'U'}
                           </div>
                         )}
@@ -444,7 +444,7 @@ const UserProfile = () => {
                             className="w-10 h-10 rounded-full object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-sm font-bold text-white">
                             {following.name && following.name[0] ? following.name[0] : 'U'}
                           </div>
                         )}

@@ -108,7 +108,7 @@ const EditPost = () => {
           >
             <button
               onClick={() => navigate(`/post/${id}`)}
-              className="flex items-center gap-2 text-white/50 hover:text-emerald-300 transition-colors mb-6"
+              className="flex items-center gap-2 text-white/50 hover:text-primary-300 transition-colors mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to post
@@ -119,7 +119,7 @@ const EditPost = () => {
               <button
                 onClick={handleUpdate}
                 disabled={loading || !title.trim() || !content.trim()}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-30 shadow-lg shadow-emerald-500/15"
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm bg-gradient-to-br from-primary-500 to-primary-600 text-white hover:from-primary-400 hover:to-primary-500 transition-all disabled:opacity-30 shadow-lg shadow-primary-500/15"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Update Post
@@ -136,7 +136,7 @@ const EditPost = () => {
               <input
                 type="text"
                 placeholder="Post title..."
-                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-primary-500/50 focus:bg-white/[0.05] transition-all text-xl font-semibold"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
@@ -144,7 +144,7 @@ const EditPost = () => {
               <input
                 type="text"
                 placeholder="Tags (comma separated)..."
-                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-primary-500/50 focus:bg-white/[0.05] transition-all"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
               />
@@ -191,7 +191,7 @@ const EditPost = () => {
 
               <textarea
                 placeholder="Write your post content in Markdown..."
-                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
+                className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-primary-500/50 focus:bg-white/[0.05] transition-all min-h-[300px] sm:min-h-[400px] resize-y font-mono text-sm leading-relaxed"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
               />

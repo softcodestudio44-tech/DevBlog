@@ -8,6 +8,7 @@ export const SocketProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [presence, setPresence] = useState({});
   const [typingUsers, setTypingUsers] = useState({});
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
@@ -58,7 +59,28 @@ export const SocketProvider = ({ children }) => {
     });
 
     newSocket.on('online-users', (users) => {
-      setOnlineUsers(users);
+      setOnlineUsers(users || []);
+      setPresence((prev) => {
+        const next = { ...prev };
+        (users || []).forEach((userItem) => {
+          next[userItem.id] = { online: true, lastSeen: null };
+        });
+        return next;
+      });
+    });
+
+    newSocket.on('presence-update', ({ userId, online, lastSeen }) => {
+      setOnlineUsers((prev) => {
+        if (online) {
+          if (prev.some((user) => user.id === userId)) return prev;
+          return [...prev, { id: userId, online: true }];
+        }
+        return prev.filter((user) => user.id !== userId);
+      });
+      setPresence((prev) => ({
+        ...prev,
+        [userId]: { online, lastSeen: lastSeen || prev[userId]?.lastSeen || null },
+      }));
     });
 
     newSocket.on('user-typing', (data) => {
@@ -115,6 +137,7 @@ export const SocketProvider = ({ children }) => {
     <SocketContext.Provider value={{
       socket,
       onlineUsers,
+      presence,
       typingUsers,
       connected,
       joinRoom,

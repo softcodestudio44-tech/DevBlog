@@ -3,9 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Clock, Tag, ArrowRight, Sparkles, Code2, Terminal, Braces, 
-  Database, Globe, Heart, MessageCircle, Search, Cpu, Zap, 
-  Layers, Monitor, Wifi, ChevronRight, TrendingUp, BookOpen,
-  X, Users, Play
+  Database, Globe, MessageCircle, Search, Cpu, Zap, 
+  Layers, ChevronRight, BookOpen,
+  X, Users
 } from 'lucide-react';
 import api from '../api/axios';
 import GlassCard from '../components/GlassCard';
@@ -23,11 +23,9 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
-  const [stats, setStats] = useState({ posts: 0, users: 0, likes: 0 });
 
   useEffect(() => {
     fetchPosts();
-    fetchStats();
   }, []);
 
   useEffect(() => {
@@ -108,15 +106,6 @@ const Home = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const res = await api.get('/stats');
-      setStats(res.data);
-    } catch (err) {
-      setStats({ posts: posts.length, users: 1, likes: 0 });
-    }
-  };
-
   const filteredPosts = posts.filter((post) =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -160,16 +149,16 @@ const Home = () => {
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
         {/* Enhanced orbital rings */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] md:w-[700px] md:h-[700px] rounded-full border border-[#d6e86d]/15 animate-spin-slow" style={{ animationDuration: '30s' }}>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#d6e86d]/60 shadow-[0_0_30px_rgba(214,232,109,0.6)]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] md:w-[700px] md:h-[700px] rounded-full border border-primary/15 animate-spin-slow" style={{ animationDuration: '30s' }}>
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-primary-400/60 shadow-[0_0_30px_rgba(96,165,250,0.6)]" />
           </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] md:w-[500px] md:h-[500px] rounded-full border border-[#d6e86d]/20 animate-spin-slow" style={{ animationDuration: '20s', animationDirection: 'reverse' }}>
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 rounded-full bg-[#d6e86d]/70 shadow-[0_0_25px_rgba(214,232,109,0.5)]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] md:w-[500px] md:h-[500px] rounded-full border border-primary/20 animate-spin-slow" style={{ animationDuration: '20s', animationDirection: 'reverse' }}>
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 rounded-full bg-primary-400/70 shadow-[0_0_25px_rgba(96,165,250,0.5)]" />
           </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] md:w-[320px] md:h-[320px] rounded-full border border-[#d6e86d]/25 animate-spin-slow" style={{ animationDuration: '15s' }}>
-            <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-[#d6e86d]/80 shadow-[0_0_25px_rgba(214,232,109,0.5)]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] md:w-[320px] md:h-[320px] rounded-full border border-primary-400/25 animate-spin-slow" style={{ animationDuration: '15s' }}>
+            <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary-400/80 shadow-[0_0_25px_rgba(96,165,250,0.5)]" />
           </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] rounded-full bg-[#d6e86d]/8 blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] rounded-full bg-primary/8 blur-3xl" />
         </div>
 
         {/* Floating icons */}
@@ -186,7 +175,7 @@ const Home = () => {
             }}
             transition={{ duration: 5, delay, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <Icon className="text-[#d6e86d]/30" style={{ width: size, height: size }} />
+            <Icon className="text-primary-400/30" style={{ width: size, height: size }} />
           </motion.div>
         ))}
 
@@ -204,7 +193,7 @@ const Home = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#d6e86d]/10 border border-[#d6e86d]/20 text-[#d6e86d] text-sm font-medium mb-6"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary-400 text-sm font-medium mb-6"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Built for Developers</span>
@@ -221,30 +210,6 @@ const Home = () => {
                 A developer-first platform to share knowledge, write tutorials, 
                 and connect with the global coding community.
               </p>
-
-              <div className="flex justify-center lg:justify-start gap-4 md:gap-6 mb-8">
-                {[
-                  { label: 'Posts', value: stats.posts || posts.length, icon: BookOpen },
-                  { label: 'Devs', value: stats.users || '1K+', icon: Users },
-                  { label: 'Likes', value: stats.likes || '10K+', icon: Heart },
-                ].map((stat, i) => (
-                  <motion.div
-                    key={stat.label}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + i * 0.1 }}
-                    className="flex items-center gap-2"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-[#d6e86d]/10 border border-[#d6e86d]/15 flex items-center justify-center">
-                      <stat.icon className="w-4 h-4 text-[#d6e86d]" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-lg font-bold text-white">{stat.value}</div>
-                      <div className="text-[10px] text-white/40">{stat.label}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
 
               <div className="flex flex-wrap justify-center lg:justify-start gap-4">
                 <motion.button
@@ -268,7 +233,7 @@ const Home = () => {
               </div>
             </motion.div>
 
-            {/* Right: REAL LAPTOP IMAGE */}
+            {/* Right: LAPTOP IMAGE */}
             <motion.div
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
@@ -277,7 +242,7 @@ const Home = () => {
             >
               <div className="relative max-w-lg mx-auto">
                 {/* Glow behind image */}
-                <div className="absolute -inset-8 bg-[#d6e86d]/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -inset-8 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Main laptop image */}
                 <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60">
@@ -286,7 +251,6 @@ const Home = () => {
                     alt="Developer laptop with glowing code"
                     className="w-full h-auto object-cover"
                     onError={(e) => {
-                      // Fallback to another image if this fails
                       e.target.src = "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop";
                     }}
                   />
@@ -309,7 +273,7 @@ const Home = () => {
                       </div>
                       <span className="text-[10px] text-white/40 ml-2 font-mono">devblog.js</span>
                     </div>
-                    <div className="font-mono text-[11px] text-[#d6e86d]/80 space-y-0.5">
+                    <div className="font-mono text-[11px] text-primary-400/80 space-y-0.5">
                       <p>const devBlog = new Platform();</p>
                       <p>devBlog.connect(developers);</p>
                       <p className="text-white/40">{'>'} Ready on localhost:3000</p>
@@ -319,11 +283,11 @@ const Home = () => {
 
                 {/* Floating accent elements */}
                 <motion.div
-                  className="absolute -top-4 -right-4 md:-right-6 w-12 h-12 md:w-14 md:h-14 rounded-xl bg-[#d6e86d]/10 border border-[#d6e86d]/20 flex items-center justify-center backdrop-blur-sm"
+                  className="absolute -top-4 -right-4 md:-right-6 w-12 h-12 md:w-14 md:h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center backdrop-blur-sm"
                   animate={{ y: [0, -10, 0], rotate: [0, 8, 0] }}
                   transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 >
-                  <TrendingUp className="w-6 h-6 md:w-7 md:h-7 text-[#d6e86d]/70" />
+                  <Sparkles className="w-6 h-6 md:w-7 md:h-7 text-primary-400/70" />
                 </motion.div>
 
                 <motion.div
@@ -332,8 +296,8 @@ const Home = () => {
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <div className="w-2 h-2 rounded-full bg-primary">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
                     </div>
                     <span className="text-[10px] md:text-xs font-medium">2.4k online now</span>
                   </div>
@@ -351,7 +315,7 @@ const Home = () => {
         >
           <div className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-2">
             <motion.div
-              className="w-1.5 h-1.5 rounded-full bg-[#d6e86d]/60"
+              className="w-1.5 h-1.5 rounded-full bg-primary-400/60"
               animate={{ y: [0, 12, 0], opacity: [1, 0.3, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
@@ -403,8 +367,8 @@ const Home = () => {
         >
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-[#d6e86d]/10 border border-[#d6e86d]/20 flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-[#d6e86d]" />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-primary-400" />
               </div>
               <h2 className="text-2xl font-bold text-white">Latest Posts</h2>
             </div>
@@ -427,11 +391,11 @@ const Home = () => {
             animate={{ opacity: 1 }}
             className="glass rounded-3xl p-16 text-center"
           >
-            <Code2 className="w-12 h-12 text-[#d6e86d]/20 mx-auto mb-4" />
+            <Code2 className="w-12 h-12 text-primary-400/20 mx-auto mb-4" />
             <p className="text-white/40 text-lg">No posts found matching your search</p>
             <button
               onClick={() => setSearchQuery('')}
-              className="mt-4 text-[#d6e86d] hover:underline text-sm"
+              className="mt-4 text-primary-400 hover:underline text-sm"
             >
               Clear search
             </button>
@@ -446,7 +410,7 @@ const Home = () => {
                 viewport={{ once: true, margin: '-50px' }}
                 transition={{ delay: index * 0.05 }}
               >
-                <GlassCard className="h-full hover:border-[#d6e86d]/20 transition-all duration-300 group">
+                <GlassCard className="h-full hover:border-primary/20 transition-all duration-300 group">
                   <div className="flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-4">
                       <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
@@ -454,10 +418,10 @@ const Home = () => {
                           <img
                             src={post.author.avatar}
                             alt={post.author.name}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-[#d6e86d]/20"
+                            className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20/20"
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#d6e86d]/30 to-[#14B8A6]/30 flex items-center justify-center text-xs font-bold text-white">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600/30 to-primary-400/30 flex items-center justify-center text-xs font-bold text-white">
                             {post.author?.name?.[0] || 'U'}
                           </div>
                         )}
@@ -465,7 +429,7 @@ const Home = () => {
                       <div className="min-w-0">
                         <Link
                           to={`/user/${post.authorId}`}
-                          className="text-sm font-medium text-white hover:text-[#d6e86d] transition-colors truncate block"
+                          className="text-sm font-medium text-white hover:text-primary-400 transition-colors truncate block"
                         >
                           {post.author?.name || 'Unknown'}
                         </Link>
@@ -477,7 +441,7 @@ const Home = () => {
                     </div>
 
                     <Link to={`/post/${post.id}`} className="flex-grow group/link">
-                      <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 group-hover/link:text-[#d6e86d] transition-colors">
+                      <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 group-hover/link:text-primary-400 transition-colors">
                         <MarkdownRenderer content={post.title} />
                       </h3>
                       <p className="text-sm text-white/50 mb-4 line-clamp-3 leading-relaxed">
@@ -507,7 +471,7 @@ const Home = () => {
                         {post.tags?.slice(0, 2).map((tag) => (
                           <span
                             key={tag}
-                            className="tag text-xs flex items-center gap-1 bg-[#d6e86d]/5 border-[#d6e86d]/10 text-[#d6e86d]/70"
+                            className="tag text-xs flex items-center gap-1"
                           >
                             <Tag className="w-3 h-3" />
                             {tag}
@@ -520,7 +484,7 @@ const Home = () => {
                         </div>
                         <Link
                           to={`/post/${post.id}`}
-                          className="flex items-center gap-1 text-white/40 hover:text-[#d6e86d] transition-colors"
+                          className="flex items-center gap-1 text-white/40 hover:text-primary-400 transition-colors"
                         >
                           <MessageCircle className="w-4 h-4" />
                           <span className="text-xs">{post.commentCount || 0}</span>
@@ -543,7 +507,7 @@ const Home = () => {
           viewport={{ once: true }}
           className="text-center mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#d6e86d]/10 border border-[#d6e86d]/20 text-[#d6e86d] text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary-400 text-sm font-medium mb-4">
             <Zap className="w-4 h-4" />
             <span>Why DevBlog?</span>
           </div>
@@ -576,9 +540,9 @@ const Home = () => {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
             >
-              <div className="glass p-8 rounded-3xl h-full hover:border-[#d6e86d]/20 transition-all duration-300 group">
-                <div className="w-14 h-14 rounded-2xl bg-[#d6e86d]/10 border border-[#d6e86d]/20 flex items-center justify-center mb-5 group-hover:bg-[#d6e86d]/15 transition-colors">
-                  <feature.icon className="w-7 h-7 text-[#d6e86d]" />
+              <div className="glass p-8 rounded-3xl h-full hover:border-primary/20 transition-all duration-300 group">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:bg-primary/15 transition-colors">
+                  <feature.icon className="w-7 h-7 text-primary-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">{feature.title}</h3>
                 <p className="text-white/50 leading-relaxed">{feature.desc}</p>
@@ -596,7 +560,7 @@ const Home = () => {
           viewport={{ once: true }}
           className="glass-strong rounded-3xl p-10 md:p-16 text-center relative overflow-hidden"
         >
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#d6e86d]/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
