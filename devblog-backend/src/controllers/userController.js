@@ -1,7 +1,6 @@
 const prisma = require('../config/database');
 const { cloudinary } = require('../config/cloudinary');
-
-const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
+const { ADMIN_EMAIL } = require('../config/constants');
 
 const getUserProfile = async (req, res) => {
   try {
@@ -91,17 +90,19 @@ const getUserPosts = async (req, res) => {
 
     const posts = await prisma.post.findMany({
       where: whereClause,
-      include: { author: { select: { id: true, name: true, avatar: true } } },
+      include: {
+        author: { select: { id: true, name: true, avatar: true } },
+        _count: { select: { likes: true, comments: true } },
+      },
       orderBy: { createdAt: 'desc' }
     });
 
-    const postsWithCounts = await Promise.all(
-      posts.map(async (post) => {
-        const likeCount = await prisma.like.count({ where: { postId: post.id } });
-        const commentCount = await prisma.comment.count({ where: { postId: post.id } });
-        return { ...post, likeCount, commentCount };
-      })
-    );
+    const postsWithCounts = posts.map((post) => ({
+      ...post,
+      likeCount: post._count.likes,
+      commentCount: post._count.comments,
+      _count: undefined,
+    }));
 
     res.json(postsWithCounts);
   } catch (error) {

@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { createNotification } = require('./notificationController');
+const { ADMIN_EMAIL } = require('../config/constants');
 
 const getComments = async (req, res) => {
   try {
@@ -94,7 +95,7 @@ const deleteComment = async (req, res) => {
 
     const isCommentAuthor = comment.authorId === req.user.id;
     const isPostOwner = comment.post.authorId === req.user.id;
-    const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
+    const isAdmin = req.user.role === 'admin' || req.user.email === ADMIN_EMAIL;
 
     if (!isCommentAuthor && !isPostOwner && !isAdmin) {
       return res.status(403).json({ message: 'Not authorized to delete this comment' });

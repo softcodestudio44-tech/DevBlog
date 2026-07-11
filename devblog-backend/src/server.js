@@ -15,11 +15,10 @@ const aiRoutes = require('./routes/aiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 const prisma = require('./config/database');
+const { ADMIN_EMAIL } = require('./config/constants');
 
 const app = express();
 const server = http.createServer(app);
-
-const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
 
 // CORS allowed origins
 const ALLOWED_ORIGINS = [
@@ -104,6 +103,11 @@ io.on('connection', (socket) => {
       socketId: socket.id,
     });
     io.emit('online-users', Array.from(onlineUsers.values()));
+    io.to(`user:${socket.user.id}`).emit('presence-update', {
+      userId: socket.user.id,
+      online: true,
+      lastSeen: null,
+    });
   }
 
   socket.on('join-room', (roomId) => {
@@ -213,11 +217,57 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('mark-as-read', async (data) => {
+    try {
+      const { roomName } = data;
+      if (!socket.user || !roomName) return;
+
+      const room = await prisma.chatRoom.findUnique({ where: { name: roomName } });
+      if (!room) return;
+
+      const unreadMessages = await prisma.chatMessage.findMany({
+        where: {
+          roomId: room.id,
+          authorId: { not: socket.user.id },
+          readAt: null,
+        },
+        select: { id: true, authorId: true },
+      });
+
+      if (!unreadMessages.length) return;
+
+      const now = new Date();
+      await prisma.chatMessage.updateMany({
+        where: {
+          id: { in: unreadMessages.map((message) => message.id) },
+          authorId: { not: socket.user.id },
+        },
+        data: { readAt: now },
+      });
+
+      const senderIds = [...new Set(unreadMessages.map((message) => message.authorId).filter(Boolean))];
+      senderIds.forEach((senderId) => {
+        io.to(`user:${senderId}`).emit('messages-read', {
+          roomName,
+          messageIds: unreadMessages.map((message) => message.id),
+          readBy: socket.user.id,
+        });
+      });
+    } catch (error) {
+      console.error('Mark as read error:', error);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     if (socket.user) {
       onlineUsers.delete(socket.user.id);
       io.emit('online-users', Array.from(onlineUsers.values()));
+      io.to(`user:${socket.user.id}`).emit('presence-update', {
+        userId: socket.user.id,
+        online: false,
+        lastSeen: new Date().toISOString(),
+      });
     }
   });
 });

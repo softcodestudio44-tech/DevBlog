@@ -81,16 +81,17 @@ const markAllAsRead = async (req, res) => {
 const createNotification = async ({ userId, type, message, sourceId, sourceType, actorId }) => {
   try {
     // Get actor name for the message
-    let actorName = 'Someone';
+    let actorName = null;
     if (actorId) {
       const actor = await prisma.user.findUnique({
         where: { id: actorId },
         select: { name: true },
       });
-      actorName = actor?.name || 'Someone';
+      actorName = actor?.name || null;
     }
 
-    const finalMessage = message.replace('undefined', actorName);
+    // Build the final message with clean template replacement
+    const finalMessage = message.replace('undefined', actorName || 'Someone');
 
     const notification = await prisma.notification.create({
       data: {
@@ -110,8 +111,6 @@ const createNotification = async ({ userId, type, message, sourceId, sourceType,
     });
 
     // Emit socket event for real-time notification
-    // We need to get io from the global or pass it somehow
-    // For now, we'll use a global approach
     const io = global.io;
     if (io) {
       io.to(`user:${userId}`).emit('new-notification', {

@@ -11,8 +11,8 @@ const {
 } = require('../controllers/userController');
 const upload = require('../middleware/upload');
 
-// Get user profile - protected so isFollowing works
-router.get('/:id', protect, getUserProfile);
+// Get user profile - public (controller handles auth check for isFollowing)
+router.get('/:id', getUserProfile);
 
 // Get user posts - public
 router.get('/:id/posts', getUserPosts);

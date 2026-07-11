@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { cloudinary } = require('../config/cloudinary');
+const { ADMIN_EMAIL } = require('../config/constants');
 
 const getAllPosts = async (req, res) => {
   try {
@@ -7,17 +8,17 @@ const getAllPosts = async (req, res) => {
       where: { isDraft: false },
       include: {
         author: { select: { id: true, name: true, email: true, avatar: true } },
+        _count: { select: { likes: true, comments: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    const postsWithCounts = await Promise.all(
-      posts.map(async (post) => {
-        const likeCount = await prisma.like.count({ where: { postId: post.id } });
-        const commentCount = await prisma.comment.count({ where: { postId: post.id } });
-        return { ...post, likeCount, commentCount };
-      })
-    );
+    const postsWithCounts = posts.map((post) => ({
+      ...post,
+      likeCount: post._count.likes,
+      commentCount: post._count.comments,
+      _count: undefined,
+    }));
 
     res.json(postsWithCounts);
   } catch (error) {
@@ -90,7 +91,7 @@ const updatePost = async (req, res) => {
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
+    const isAdmin = req.user.role === 'admin' || req.user.email === ADMIN_EMAIL;
     if (post.authorId !== req.user.id && !isAdmin) {
       return res.status(403).json({ message: 'Not authorized to edit this post' });
     }
@@ -122,7 +123,7 @@ const deletePost = async (req, res) => {
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
+    const isAdmin = req.user.role === 'admin' || req.user.email === ADMIN_EMAIL;
     if (post.authorId !== req.user.id && !isAdmin) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
