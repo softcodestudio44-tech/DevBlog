@@ -29,8 +29,10 @@ const UserProfile = () => {
     if (!socket) return;
 
     const handleFollowUpdate = (data) => {
-      if (data.followingId === id || data.followerId === id) {
-        // Refresh profile data when follow/unfollow happens
+      // Refresh profile data when anyone follows/unfollows this user
+      // or when the current user follows/unfollows someone
+      if (data.followingId === id || data.followerId === id || 
+          data.followingId === currentUser?.id || data.followerId === currentUser?.id) {
         fetchProfileData();
       }
     };
@@ -40,7 +42,7 @@ const UserProfile = () => {
     return () => {
       socket.off('follow-update', handleFollowUpdate);
     };
-  }, [socket, id]);
+  }, [socket, id, currentUser?.id]);
 
   const fetchProfileData = async () => {
     try {

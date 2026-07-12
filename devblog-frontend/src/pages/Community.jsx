@@ -14,7 +14,7 @@ const CHANNEL_MESSAGES_KEY = 'devblog-community-messages';
 
 const Community = () => {
   const { user, isAuthenticated } = useAuth();
-  const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, sendMessage, setTyping, connected } = useSocket();
+  const { socket, onlineUsers, typingUsers, joinRoom, leaveRoom, setTyping, connected } = useSocket();
   const navigate = useNavigate();
   
   const [rooms, setRooms] = useState([]);
@@ -48,6 +48,7 @@ const Community = () => {
   const inputRef = useRef(null);
   const typingTimerRef = useRef(null);
   const processedChannelMessagesRef = useRef(new Set());
+  const tempIdsRef = useRef(new Set()); // Track temp message IDs to prevent duplicates
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
@@ -60,6 +61,11 @@ const Community = () => {
     if (!socket) return;
 
     const handleNewChannelMessage = (message) => {
+      // Skip temp messages we created ourselves
+      if (tempIdsRef.current.has(message.id)) {
+        tempIdsRef.current.delete(message.id);
+        return;
+      }
       if (processedChannelMessagesRef.current.has(message.id)) return;
       processedChannelMessagesRef.current.add(message.id);
       
@@ -175,13 +181,26 @@ const Community = () => {
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeRoom) return;
+    if (!newMessage.trim() || !activeRoom || !socket?.connected) return;
     
     const content = replyTo
       ? `> ${replyTo.content}\n\n${newMessage.trim()}`
       : newMessage.trim();
+
+    // Add optimistic message immediately
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage = {
+      id: tempId,
+      content: content,
+      authorId: user.id,
+      author: { id: user.id, name: user.name, avatar: user.avatar },
+      createdAt: new Date().toISOString(),
+      roomId: activeRoom.id,
+    };
+    setChannelMessages(prev => [...prev, optimisticMessage]);
+    tempIdsRef.current.add(tempId);
     
-    sendMessage(activeRoom.id, content);
+    socket.emit('send-message', { roomId: activeRoom.id, content });
     setNewMessage('');
     setReplyTo(null);
     if (inputRef.current) inputRef.current.focus();

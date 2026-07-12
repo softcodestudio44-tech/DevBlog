@@ -86,36 +86,47 @@ const Messages = () => {
     if (!socket) return;
 
     const handleNewDM = (message) => {
+      // If this is our own message, replace the temp message
+      if (message.authorId === user?.id) {
+        setDmMessages(prev => {
+          const tempIndex = prev.findIndex(m => m.id.startsWith('temp-') && m.authorId === message.authorId && m.content === message.content);
+          if (tempIndex >= 0) {
+            const updated = [...prev];
+            updated[tempIndex] = { ...message, deliveryStatus: 'Delivered' };
+            return updated;
+          }
+          return prev;
+        });
+        return;
+      }
+
       if (processedDMessagesRef.current.has(message.id)) return;
       processedDMessagesRef.current.add(message.id);
 
-      const isFromMe = message.authorId === user?.id;
       const normalizedMessage = {
         ...message,
-        deliveryStatus: message.readAt ? 'Read' : (isFromMe ? 'Delivered' : undefined),
+        deliveryStatus: message.readAt ? 'Read' : undefined,
       };
       
       // Update DM history sidebar
-      if (!isFromMe) {
-        setDmHistory(prev => {
-          const fromId = message.authorId;
-          const existingIndex = prev.findIndex(u => u.id === fromId);
-          const newEntry = {
-            id: fromId,
-            name: message.author?.name,
-            avatar: message.author?.avatar,
-            lastMessage: message.content,
-            lastMessageAt: message.createdAt,
-          };
-          if (existingIndex >= 0) {
-            const updated = [...prev];
-            updated[existingIndex] = newEntry;
-            const [item] = updated.splice(existingIndex, 1);
-            return [item, ...updated];
-          }
-          return [newEntry, ...prev];
-        });
-      }
+      setDmHistory(prev => {
+        const fromId = message.authorId;
+        const existingIndex = prev.findIndex(u => u.id === fromId);
+        const newEntry = {
+          id: fromId,
+          name: message.author?.name,
+          avatar: message.author?.avatar,
+          lastMessage: message.content,
+          lastMessageAt: message.createdAt,
+        };
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = newEntry;
+          const [item] = updated.splice(existingIndex, 1);
+          return [item, ...updated];
+        }
+        return [newEntry, ...prev];
+      });
 
       const activeRoomName = activeDMUserRef.current
         ? `dm:${[user?.id, activeDMUserRef.current.id].sort().join(':')}`
@@ -123,12 +134,6 @@ const Messages = () => {
       if (!activeRoomName || message.roomName !== activeRoomName) return;
 
       setDmMessages(prev => {
-        const tempIndex = prev.findIndex(m => m.id.startsWith('temp-') && m.authorId === message.authorId && m.content === message.content);
-        if (tempIndex >= 0) {
-          const updated = [...prev];
-          updated[tempIndex] = message;
-          return updated;
-        }
         if (prev.some(m => m.id === message.id)) return prev;
         return [...prev, normalizedMessage];
       });
