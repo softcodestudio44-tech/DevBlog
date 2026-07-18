@@ -26,18 +26,7 @@ const Community = () => {
       return null;
     }
   });
-  const [channelMessages, setChannelMessages] = useState(() => {
-    try {
-      const savedRoomId = localStorage.getItem(CHANNEL_ROOM_KEY);
-      if (savedRoomId) {
-        const cached = localStorage.getItem(`${CHANNEL_MESSAGES_KEY}:${savedRoomId}`);
-        return cached ? JSON.parse(cached) : [];
-      }
-      return [];
-    } catch (err) {
-      return [];
-    }
-  });
+  const [channelMessages, setChannelMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -48,7 +37,9 @@ const Community = () => {
   const inputRef = useRef(null);
   const typingTimerRef = useRef(null);
   const processedChannelMessagesRef = useRef(new Set());
-  const tempIdsRef = useRef(new Set()); // Track temp message IDs to prevent duplicates
+  const tempIdsRef = useRef(new Set());
+  const activeRoomRef = useRef(null);
+  const fetchAbortRef = useRef(null);
 
   const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
   const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
@@ -58,10 +49,13 @@ const Community = () => {
   }, []);
 
   useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
+  useEffect(() => {
     if (!socket) return;
 
     const handleNewChannelMessage = (message) => {
-      // Skip temp messages we created ourselves
       if (tempIdsRef.current.has(message.id)) {
         tempIdsRef.current.delete(message.id);
         return;
@@ -69,7 +63,8 @@ const Community = () => {
       if (processedChannelMessagesRef.current.has(message.id)) return;
       processedChannelMessagesRef.current.add(message.id);
       
-      if (activeRoom && message.roomId === activeRoom.id) {
+      const currentRoom = activeRoomRef.current;
+      if (currentRoom && message.roomId === currentRoom.id) {
         setChannelMessages(prev => {
           if (prev.some(m => m.id === message.id)) return prev;
           return [...prev, message];
@@ -83,7 +78,8 @@ const Community = () => {
     };
 
     const handleMessagesCleared = ({ roomId }) => {
-      if (activeRoom?.id === roomId) {
+      const currentRoom = activeRoomRef.current;
+      if (currentRoom?.id === roomId) {
         setChannelMessages([]);
         processedChannelMessagesRef.current.clear();
       }
@@ -98,24 +94,7 @@ const Community = () => {
       socket.off('message-deleted', handleMessageDeleted);
       socket.off('messages-cleared', handleMessagesCleared);
     };
-  }, [socket, activeRoom]);
-
-  useEffect(() => {
-    if (!socket || !connected || !activeRoom) return;
-    
-    const refreshMessages = async () => {
-      try {
-        const res = await api.get(`/chat/rooms/${activeRoom.id}/messages`);
-        setChannelMessages(res.data || []);
-        processedChannelMessagesRef.current.clear();
-        res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
-      } catch (err) {
-        console.error('Failed to refresh channel messages:', err);
-      }
-    };
-    
-    refreshMessages();
-  }, [connected, activeRoom]);
+  }, [socket]);
 
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -139,6 +118,33 @@ const Community = () => {
     }
   };
 
+  const fetchMessagesForRoom = async (room) => {
+    if (!room) return;
+    if (fetchAbortRef.current) {
+      fetchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
+    setChannelMessages([]);
+    processedChannelMessagesRef.current.clear();
+
+    try {
+      const cached = localStorage.getItem(`${CHANNEL_MESSAGES_KEY}:${room.id}`);
+      if (cached) {
+        setChannelMessages(JSON.parse(cached));
+      }
+      const res = await api.get(`/chat/rooms/${room.id}/messages`, { signal: controller.signal });
+      setChannelMessages(res.data || []);
+      processedChannelMessagesRef.current.clear();
+      res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to fetch messages:', err);
+      }
+    }
+  };
+
   const selectRoom = async (room) => {
     if (!room) return;
     if (activeRoom && activeRoom.id !== room.id) {
@@ -154,26 +160,8 @@ const Community = () => {
     setShowSidebar(false);
     localStorage.setItem(CHANNEL_ROOM_KEY, room.id);
     joinRoom(room.id);
-    try {
-      const cached = localStorage.getItem(`${CHANNEL_MESSAGES_KEY}:${room.id}`);
-      if (cached) {
-        setChannelMessages(JSON.parse(cached));
-      }
-      const res = await api.get(`/chat/rooms/${room.id}/messages`);
-      setChannelMessages(res.data || []);
-      processedChannelMessagesRef.current.clear();
-      res.data?.forEach(m => processedChannelMessagesRef.current.add(m.id));
-    } catch (err) { console.error(err); }
+    await fetchMessagesForRoom(room);
   };
-
-  useEffect(() => {
-    if (!activeRoom?.id) return;
-    try {
-      localStorage.setItem(`${CHANNEL_MESSAGES_KEY}:${activeRoom.id}`, JSON.stringify(channelMessages));
-    } catch (err) {
-      console.error('Failed to save community channel messages:', err);
-    }
-  }, [activeRoom?.id, channelMessages]);
 
   const toggleSidebar = () => {
     setShowSidebar(prev => !prev);
@@ -230,6 +218,42 @@ const Community = () => {
       setChannelMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (err) {
       console.error('Delete message failed:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleRoomDeleted = ({ roomId }) => {
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+      if (activeRoomRef.current?.id === roomId) {
+        setRooms(prevRooms => {
+          if (prevRooms.length > 0) {
+            selectRoom(prevRooms[0]);
+          } else {
+            setActiveRoom(null);
+            setChannelMessages([]);
+          }
+          return prevRooms;
+        });
+      }
+    };
+
+    socket.on('room-deleted', handleRoomDeleted);
+
+    return () => {
+      socket.off('room-deleted', handleRoomDeleted);
+    };
+  }, [socket]);
+
+  const handleDeleteRoom = async (e, room) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete #${room.name}? This will permanently remove the room and all its messages.`)) return;
+    try {
+      await api.delete(`/chat/rooms/${room.id}`);
+    } catch (err) {
+      console.error('Failed to delete room:', err);
+      alert('Failed to delete room: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -336,7 +360,7 @@ const Community = () => {
               <button
                 key={room.id}
                 onClick={() => selectRoom(room)}
-                className={`w-full text-left p-3 rounded-xl transition-all ${
+                className={`group w-full text-left p-3 rounded-xl transition-all ${
                   activeRoom?.id === room.id
                     ? 'bg-primary/10 border border-primary/20'
                     : 'hover:bg-white/[0.02] border border-transparent'
@@ -353,6 +377,15 @@ const Community = () => {
                     {room.topic && <span className="text-[11px] text-white/40 truncate block">{room.topic}</span>}
                     <span className="text-[10px] text-white/25">{room.memberCount > 0 ? room.memberCount : (onlineUsers.length || 1)} members</span>
                   </div>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => handleDeleteRoom(e, room)}
+                      className="p-1.5 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                      title={`Delete #${room.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </button>
             ))}
