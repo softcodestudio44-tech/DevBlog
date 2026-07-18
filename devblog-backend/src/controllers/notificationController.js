@@ -1,5 +1,14 @@
 const prisma = require('../config/database');
 
+// Helper function to add cache-busting to avatar URLs
+const addCacheBust = (user) => {
+  if (user && user.avatar && user.updatedAt) {
+    const timestamp = new Date(user.updatedAt).getTime();
+    user.avatar = `${user.avatar}?v=${timestamp}`;
+  }
+  return user;
+};
+
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -16,6 +25,13 @@ const getNotifications = async (req, res) => {
           select: { id: true, name: true, avatar: true },
         },
       },
+    });
+
+    // Add cache-busting to actor avatars
+    notifications.forEach(notification => {
+      if (notification.actor) {
+        addCacheBust(notification.actor);
+      }
     });
 
     // Format notifications with actor name

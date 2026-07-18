@@ -11,7 +11,7 @@ const getUserProfile = async (req, res) => {
       select: {
         id: true, name: true, email: true, avatar: true, bio: true, role: true,
         github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true,
-        createdAt: true,
+        createdAt: true, updatedAt: true,
       }
     });
 
@@ -51,6 +51,12 @@ const getUserProfile = async (req, res) => {
       where: { followerId: id }, take: 10, orderBy: { createdAt: 'desc' },
       include: { following: { select: { id: true, name: true, avatar: true } } }
     });
+
+    // Add cache-busting parameter to avatar URL
+    if (user.avatar && user.updatedAt) {
+      const timestamp = new Date(user.updatedAt).getTime();
+      user.avatar = `${user.avatar}?v=${timestamp}`;
+    }
 
     res.json({
       ...user, isAdmin, postCount, likeCount: totalLikesReceived,
@@ -129,8 +135,15 @@ const uploadAvatar = async (req, res) => {
       select: {
         id: true, name: true, email: true, avatar: true, bio: true, role: true,
         github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true,
+        updatedAt: true,
       },
     });
+
+    // Add cache-busting parameter to avatar URL
+    if (user.avatar && user.updatedAt) {
+      const timestamp = new Date(user.updatedAt).getTime();
+      user.avatar = `${user.avatar}?v=${timestamp}`;
+    }
 
     res.json({ message: 'Avatar uploaded', user });
   } catch (error) {

@@ -2,6 +2,15 @@ const prisma = require('../config/database');
 const { createNotification } = require('./notificationController');
 const { ADMIN_EMAIL } = require('../config/constants');
 
+// Helper function to add cache-busting to avatar URLs
+const addCacheBust = (user) => {
+  if (user && user.avatar && user.updatedAt) {
+    const timestamp = new Date(user.updatedAt).getTime();
+    user.avatar = `${user.avatar}?v=${timestamp}`;
+  }
+  return user;
+};
+
 const getComments = async (req, res) => {
   try {
     const { postId } = req.params;
@@ -24,6 +33,20 @@ const getComments = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
+    // Add cache-busting to author avatars
+    comments.forEach(comment => {
+      if (comment.author) {
+        addCacheBust(comment.author);
+      }
+      if (comment.replies) {
+        comment.replies.forEach(reply => {
+          if (reply.author) {
+            addCacheBust(reply.author);
+          }
+        });
+      }
+    });
+
     res.json(comments);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -74,6 +97,9 @@ const createComment = async (req, res) => {
     if (io) {
       io.emit('new-comment', { postId, comment });
     }
+
+    // Add cache-busting to author avatar
+    addCacheBust(comment.author);
 
     res.status(201).json({ message: 'Comment added', comment });
   } catch (error) {

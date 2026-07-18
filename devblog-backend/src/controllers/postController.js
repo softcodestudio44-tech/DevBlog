@@ -2,6 +2,15 @@ const prisma = require('../config/database');
 const { cloudinary } = require('../config/cloudinary');
 const { ADMIN_EMAIL } = require('../config/constants');
 
+// Helper function to add cache-busting to avatar URLs
+const addCacheBust = (user) => {
+  if (user && user.avatar && user.updatedAt) {
+    const timestamp = new Date(user.updatedAt).getTime();
+    user.avatar = `${user.avatar}?v=${timestamp}`;
+  }
+  return user;
+};
+
 const getAllPosts = async (req, res) => {
   try {
     const posts = await prisma.post.findMany({
@@ -19,6 +28,13 @@ const getAllPosts = async (req, res) => {
       commentCount: post._count.comments,
       _count: undefined,
     }));
+
+    // Add cache-busting to author avatars
+    postsWithCounts.forEach(post => {
+      if (post.author) {
+        addCacheBust(post.author);
+      }
+    });
 
     res.json(postsWithCounts);
   } catch (error) {
@@ -45,6 +61,11 @@ const getPostById = async (req, res) => {
     const likeCount = await prisma.like.count({ where: { postId: post.id } });
     const commentCount = await prisma.comment.count({ where: { postId: post.id } });
 
+    // Add cache-busting to author avatar
+    if (post.author) {
+      addCacheBust(post.author);
+    }
+
     res.json({ ...post, likeCount, commentCount });
   } catch (error) {
     console.error('getPostById error:', error);
@@ -67,6 +88,9 @@ const createPost = async (req, res) => {
       },
       include: { author: { select: { id: true, name: true, email: true, avatar: true } } },
     });
+
+    // Add cache-busting to author avatar
+    addCacheBust(post.author);
 
     const postWithCounts = { ...post, likeCount: 0, commentCount: 0 };
 
@@ -104,6 +128,9 @@ const updatePost = async (req, res) => {
 
     const likeCount = await prisma.like.count({ where: { postId: id } });
     const commentCount = await prisma.comment.count({ where: { postId: id } });
+    // Add cache-busting to author avatar
+    addCacheBust(updated.author);
+
     const postWithCounts = { ...updated, likeCount, commentCount };
 
     const io = req.app.get('io') || global.io;

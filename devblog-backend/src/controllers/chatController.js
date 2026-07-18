@@ -1,5 +1,14 @@
 const prisma = require('../config/database');
 
+// Helper function to add cache-busting to avatar URLs
+const addCacheBust = (user) => {
+  if (user && user.avatar && user.updatedAt) {
+    const timestamp = new Date(user.updatedAt).getTime();
+    user.avatar = `${user.avatar}?v=${timestamp}`;
+  }
+  return user;
+};
+
 const DEFAULT_ROOMS = [
   { name: 'general', topic: 'General discussion for all developers' },
   { name: 'javascript', topic: 'JavaScript, TypeScript, Node.js' },
@@ -133,6 +142,9 @@ const sendDirectMessage = async (req, res) => {
       },
     });
 
+    // Add cache-busting to author avatar
+    addCacheBust(message.author);
+
     const io = req.app?.get('io') || global.io;
     if (io) {
       io.to(`user:${senderId}`).to(`user:${recipientId}`).emit('new-dm', {
@@ -213,6 +225,13 @@ const getMessages = async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
 
+    // Add cache-busting to author avatars
+    messages.forEach(message => {
+      if (message.author) {
+        addCacheBust(message.author);
+      }
+    });
+
     res.json(messages);
   } catch (error) {
     console.error('getMessages error:', error);
@@ -273,6 +292,12 @@ const getDMHistory = async (req, res) => {
         });
 
         if (otherUser) {
+          // Add cache-busting to avatar
+          if (otherUser.avatar && otherUser.updatedAt) {
+            const timestamp = new Date(otherUser.updatedAt).getTime();
+            otherUser.avatar = `${otherUser.avatar}?v=${timestamp}`;
+          }
+
           dmPartners.push({
             id: otherUser.id,
             name: otherUser.name,

@@ -14,7 +14,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
-const prisma = require('./config/database');
+const { prisma, withReconnect } = require('./config/database');
 const { ADMIN_EMAIL } = require('./config/constants');
 
 const app = express();
@@ -48,17 +48,63 @@ const io = new Server(server, {
 });
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-const pubClient = createClient({ url: redisUrl });
-const subClient = pubClient.duplicate();
+let redisConnected = false;
 
-Promise.all([pubClient.connect(), subClient.connect()])
-  .then(() => {
+const connectRedis = async () => {
+  try {
+    const pubClient = createClient({ 
+      url: redisUrl,
+      socket: {
+        connectTimeout: 5000,
+        reconnectStrategy: {
+          maxRetriesPerRequest: 3
+        }
+      }
+    });
+    const subClient = pubClient.duplicate();
+
+    pubClient.on('error', (err) => {
+      console.error('❌ Redis pubClient error:', err.message);
+      redisConnected = false;
+    });
+
+    subClient.on('error', (err) => {
+      console.error('❌ Redis subClient error:', err.message);
+      redisConnected = false;
+    });
+
+    pubClient.on('connect', () => {
+      console.log('✅ Redis pubClient connected');
+      redisConnected = true;
+    });
+
+    subClient.on('connect', () => {
+      console.log('✅ Redis subClient connected');
+      redisConnected = true;
+    });
+
+    await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
-    console.log('✅ Socket.IO Redis adapter connected');
-  })
-  .catch((err) => {
-    console.error('⚠️ Socket.IO Redis adapter failed to connect:', err);
-  });
+    console.log('✅ Socket.IO Redis adapter connected - Multi-server mode enabled');
+    return true;
+  } catch (err) {
+    console.error('⚠️ Socket.IO Redis adapter failed to connect:', err.message);
+    console.log('ℹ️  Socket.IO running in single-server mode (no Redis)');
+    redisConnected = false;
+    return false;
+  }
+};
+
+// Initial Redis connection
+connectRedis();
+
+// Retry Redis connection every 30 seconds
+setInterval(async () => {
+  if (!redisConnected) {
+    console.log('🔄 Attempting to reconnect Redis...');
+    await connectRedis();
+  }
+}, 30000);
 
 // Make io accessible globally for notification controller
 app.set('io', io);
@@ -76,7 +122,7 @@ io.use(async (socket, next) => {
 
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await prisma.user.findUnique({
+    const user = await withReconnect(prisma.user.findUnique, {
       where: { id: decoded.id },
       select: { id: true, name: true, avatar: true, email: true, role: true },
     });
@@ -130,7 +176,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const message = await prisma.chatMessage.create({
+      const message = await withReconnect(prisma.chatMessage.create, {
         data: {
           content,
           roomId,
@@ -160,12 +206,12 @@ io.on('connection', (socket) => {
       const sortedIds = [socket.user.id, recipientId].sort();
       const roomName = `dm:${sortedIds[0]}:${sortedIds[1]}`;
 
-      let room = await prisma.chatRoom.findUnique({
+      let room = await withReconnect(prisma.chatRoom.findUnique, {
         where: { name: roomName },
       });
 
       if (!room) {
-        room = await prisma.chatRoom.create({
+        room = await withReconnect(prisma.chatRoom.create, {
           data: {
             name: roomName,
             topic: 'Direct Message',
@@ -173,7 +219,7 @@ io.on('connection', (socket) => {
         });
       }
 
-      const message = await prisma.chatMessage.create({
+      const message = await withReconnect(prisma.chatMessage.create, {
         data: {
           content,
           roomId: room.id,
@@ -222,10 +268,10 @@ io.on('connection', (socket) => {
       const { roomName } = data;
       if (!socket.user || !roomName) return;
 
-      const room = await prisma.chatRoom.findUnique({ where: { name: roomName } });
+      const room = await withReconnect(prisma.chatRoom.findUnique, { where: { name: roomName } });
       if (!room) return;
 
-      const unreadMessages = await prisma.chatMessage.findMany({
+      const unreadMessages = await withReconnect(prisma.chatMessage.findMany, {
         where: {
           roomId: room.id,
           authorId: { not: socket.user.id },
@@ -237,7 +283,7 @@ io.on('connection', (socket) => {
       if (!unreadMessages.length) return;
 
       const now = new Date();
-      await prisma.chatMessage.updateMany({
+      await withReconnect(prisma.chatMessage.updateMany, {
         where: {
           id: { in: unreadMessages.map((message) => message.id) },
           authorId: { not: socket.user.id },
@@ -279,7 +325,7 @@ const isAdmin = async (req, res, next) => {
 
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await prisma.user.findUnique({
+    const user = await withReconnect(prisma.user.findUnique, {
       where: { id: decoded.id },
       select: { email: true },
     });
@@ -299,7 +345,7 @@ app.delete('/api/admin/chat/clear/:roomId', isAdmin, async (req, res) => {
   try {
     const { roomId } = req.params;
 
-    await prisma.chatMessage.deleteMany({
+    await withReconnect(prisma.chatMessage.deleteMany, {
       where: { roomId },
     });
 
@@ -315,7 +361,7 @@ app.delete('/api/admin/chat/clear/:roomId', isAdmin, async (req, res) => {
 app.post('/api/admin/make-admin', isAdmin, async (req, res) => {
   try {
     const { userId } = req.body;
-    await prisma.user.update({
+    await withReconnect(prisma.user.update, {
       where: { id: userId },
       data: { role: 'admin' },
     });
@@ -329,9 +375,9 @@ app.post('/api/admin/make-admin', isAdmin, async (req, res) => {
 app.get('/api/stats', async (req, res) => {
   try {
     const [posts, users, likes] = await Promise.all([
-      prisma.post.count(),
-      prisma.user.count(),
-      prisma.like.count(),
+      withReconnect(prisma.post.count),
+      withReconnect(prisma.user.count),
+      withReconnect(prisma.like.count),
     ]);
     res.json({ posts, users, likes });
   } catch (err) {
@@ -343,7 +389,7 @@ app.get('/api/stats', async (req, res) => {
 // Routes - MUST come after CORS
 app.get('/api/health', async (req, res) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    const isHealthy = await withReconnect(prisma.$queryRaw, `SELECT 1`);
     res.json({ status: 'ok', db: 'connected' });
   } catch (err) {
     console.error('Health check failed:', err);
