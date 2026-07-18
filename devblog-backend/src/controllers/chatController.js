@@ -386,6 +386,44 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+// Admin: Delete an entire room and its messages
+const deleteRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    const room = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+    });
+
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+
+    // Prevent deleting DM rooms
+    if (room.name.startsWith('dm:')) {
+      return res.status(400).json({ message: 'Cannot delete DM rooms' });
+    }
+
+    await prisma.chatMessage.deleteMany({
+      where: { roomId: room.id },
+    });
+
+    await prisma.chatRoom.delete({
+      where: { id: room.id },
+    });
+
+    const io = req.app?.get('io') || global.io;
+    if (io) {
+      io.to(room.id).emit('room-deleted', { roomId: room.id, roomName: room.name });
+    }
+
+    res.json({ message: 'Room deleted', roomId: room.id });
+  } catch (error) {
+    console.error('deleteRoom error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Admin: Clear all messages in a room
 const clearRoomMessages = async (req, res) => {
   try {
@@ -415,4 +453,4 @@ const clearRoomMessages = async (req, res) => {
   }
 };
 
-module.exports = { getRooms, getMessages, getDMHistory, createRoom, deleteMessage, clearRoomMessages, sendDirectMessage, markMessagesAsRead, ensureDefaultRooms, cleanupUUIDRooms };
+module.exports = { getRooms, getMessages, getDMHistory, createRoom, deleteRoom, deleteMessage, clearRoomMessages, sendDirectMessage, markMessagesAsRead, ensureDefaultRooms, cleanupUUIDRooms };

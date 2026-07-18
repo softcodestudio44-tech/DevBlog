@@ -1,7 +1,27 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { getRooms, getMessages, getDMHistory, createRoom, deleteMessage, clearRoomMessages, sendDirectMessage, markMessagesAsRead, cleanupUUIDRooms } = require('../controllers/chatController');
+const { getRooms, getMessages, getDMHistory, createRoom, deleteRoom, deleteMessage, clearRoomMessages, sendDirectMessage, markMessagesAsRead, cleanupUUIDRooms } = require('../controllers/chatController');
+
+const isAdmin = async (req, res, next) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const { prisma, withReconnect } = require('../config/database');
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await withReconnect(prisma.user.findUnique, {
+      where: { id: decoded.id },
+      select: { email: true, role: true },
+    });
+    if (user?.role === 'admin' || user?.email === 'softcodestudio44@gmail.com') {
+      return next();
+    }
+    res.status(403).json({ message: 'Admin only' });
+  } catch (err) {
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
 
 router.get('/rooms', getRooms);
 router.get('/rooms/:roomId/messages', getMessages);
@@ -11,6 +31,7 @@ router.post('/dm', protect, sendDirectMessage);
 router.post('/messages/read', protect, markMessagesAsRead);
 router.delete('/messages/:messageId', protect, deleteMessage);
 router.delete('/rooms/:roomId/clear', protect, clearRoomMessages);
+router.delete('/rooms/:roomId', protect, isAdmin, deleteRoom);
 
 // Admin: Clean up UUID-named rooms (accidentally created with UUIDs as names)
 router.post('/admin/cleanup-uuids', protect, async (req, res) => {
