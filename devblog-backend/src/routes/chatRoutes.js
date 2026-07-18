@@ -6,11 +6,11 @@ const { getRooms, getMessages, getDMHistory, createRoom, deleteRoom, deleteMessa
 const isAdmin = async (req, res, next) => {
   try {
     const jwt = require('jsonwebtoken');
-    const { prisma, withReconnect } = require('../config/database');
+    const { prisma } = require('../config/database');
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token' });
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await withReconnect(prisma.user.findUnique, {
+    const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { email: true, role: true },
     });
