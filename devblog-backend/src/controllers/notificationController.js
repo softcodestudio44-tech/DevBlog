@@ -126,6 +126,11 @@ const createNotification = async ({ userId, type, message, sourceId, sourceType,
       },
     });
 
+    // Add cache-busting to actor avatar
+    if (notification.actor) {
+      addCacheBust(notification.actor);
+    }
+
     // Emit socket event for real-time notification
     const io = global.io;
     if (io) {

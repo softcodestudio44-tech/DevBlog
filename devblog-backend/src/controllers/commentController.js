@@ -43,6 +43,13 @@ const getComments = async (req, res) => {
           if (reply.author) {
             addCacheBust(reply.author);
           }
+          if (reply.replies) {
+            reply.replies.forEach(nestedReply => {
+              if (nestedReply.author) {
+                addCacheBust(nestedReply.author);
+              }
+            });
+          }
         });
       }
     });

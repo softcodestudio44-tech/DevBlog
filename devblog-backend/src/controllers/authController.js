@@ -2,6 +2,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 
+// Helper function to add cache-busting to avatar URLs
+const addCacheBust = (user) => {
+  if (user && user.avatar && user.updatedAt) {
+    const timestamp = new Date(user.updatedAt).getTime();
+    user.avatar = `${user.avatar}?v=${timestamp}`;
+  }
+  return user;
+};
+
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -53,18 +62,19 @@ const login = async (req, res) => {
     );
 
   // In the login function, change the res.json to:
-res.json({
-  message: 'Login successful',
-  token,
-  user: { 
-    id: user.id, 
-    name: user.name, 
-    email: user.email, 
-    role: user.role,
-    avatar: user.avatar,
-    bio: user.bio
-  }
-});
+  addCacheBust(user);
+  res.json({
+    message: 'Login successful',
+    token,
+    user: { 
+      id: user.id, 
+      name: user.name, 
+      email: user.email, 
+      role: user.role,
+      avatar: user.avatar,
+      bio: user.bio
+    }
+  });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

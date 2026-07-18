@@ -292,11 +292,7 @@ const getDMHistory = async (req, res) => {
         });
 
         if (otherUser) {
-          // Add cache-busting to avatar
-          if (otherUser.avatar && otherUser.updatedAt) {
-            const timestamp = new Date(otherUser.updatedAt).getTime();
-            otherUser.avatar = `${otherUser.avatar}?v=${timestamp}`;
-          }
+          addCacheBust(otherUser);
 
           dmPartners.push({
             id: otherUser.id,

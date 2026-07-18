@@ -2,6 +2,15 @@ const prisma = require('../config/database');
 const { cloudinary } = require('../config/cloudinary');
 const { ADMIN_EMAIL } = require('../config/constants');
 
+// Helper function to add cache-busting to avatar URLs
+const addCacheBust = (user) => {
+  if (user && user.avatar && user.updatedAt) {
+    const timestamp = new Date(user.updatedAt).getTime();
+    user.avatar = `${user.avatar}?v=${timestamp}`;
+  }
+  return user;
+};
+
 const getUserProfile = async (req, res) => {
   try {
     const { id } = req.params;
@@ -52,11 +61,10 @@ const getUserProfile = async (req, res) => {
       include: { following: { select: { id: true, name: true, avatar: true } } }
     });
 
-    // Add cache-busting parameter to avatar URL
-    if (user.avatar && user.updatedAt) {
-      const timestamp = new Date(user.updatedAt).getTime();
-      user.avatar = `${user.avatar}?v=${timestamp}`;
-    }
+    // Add cache-busting to avatars
+    addCacheBust(user);
+    followers.forEach(f => addCacheBust(f.follower));
+    following.forEach(f => addCacheBust(f.following));
 
     res.json({
       ...user, isAdmin, postCount, likeCount: totalLikesReceived,
@@ -81,6 +89,7 @@ const updateProfile = async (req, res) => {
         github: true, twitter: true, linkedin: true, website: true, tiktok: true, facebook: true,
       }
     });
+    addCacheBust(user);
     res.json({ message: 'Profile updated', user });
   } catch (error) {
     console.error('updateProfile error:', error);
@@ -109,6 +118,13 @@ const getUserPosts = async (req, res) => {
       commentCount: post._count.comments,
       _count: undefined,
     }));
+
+    // Add cache-busting to author avatars
+    postsWithCounts.forEach(post => {
+      if (post.author) {
+        addCacheBust(post.author);
+      }
+    });
 
     res.json(postsWithCounts);
   } catch (error) {
