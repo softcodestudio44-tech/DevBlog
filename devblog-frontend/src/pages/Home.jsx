@@ -7,16 +7,14 @@ import {
   Layers, ChevronRight, BookOpen,
   X, Users
 } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 
 const Home = () => {
   const { isAuthenticated } = useAuth();
-  const { socket } = useSocket();
   const navigate = useNavigate();
   const postsRef = useRef(null);
   const [posts, setPosts] = useState([]);
@@ -28,77 +26,140 @@ const Home = () => {
     fetchPosts();
   }, []);
 
+  // Subscribe to real-time post updates
   useEffect(() => {
-    if (!socket) return;
-
-    const handleNewPost = (data) => {
-      setPosts((prev) => {
-        if (prev.find((p) => p.id === data.post.id)) return prev;
-        return [data.post, ...prev];
-      });
-    };
-
-    const handlePostUpdated = (data) => {
-      setPosts((prev) =>
-        prev.map((post) =>
-          post.id === data.post.id ? { ...data.post } : post
-        )
-      );
-    };
-
-    const handlePostDeleted = (data) => {
-      setPosts((prev) => prev.filter((post) => post.id !== data.postId));
-    };
-
-    const handlePostLiked = (data) => {
-      setPosts((prev) =>
-        prev.map((post) => {
-          if (post.id === data.postId) {
-            return {
-              ...post,
-              likeCount: data.action === 'like'
-                ? (post.likeCount || 0) + 1
-                : Math.max(0, (post.likeCount || 0) - 1),
-            };
+    const channel = supabase
+      .channel('home-posts')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts',
+          filter: 'is_draft=eq.false',
+        },
+        async (payload) => {
+          const { data } = await supabase
+            .from('posts')
+            .select(`
+              *,
+              author:profiles(id, name, avatar, email),
+              likes:likes(count),
+              comments:comments(count)
+            `)
+            .eq('id', payload.new.id)
+            .single();
+          
+          if (data) {
+            setPosts((prev) => {
+              if (prev.find((p) => p.id === data.id)) return prev;
+              return [{
+                ...data,
+                likeCount: data.likes?.[0]?.count || 0,
+                commentCount: data.comments?.[0]?.count || 0,
+                likes: undefined,
+                comments: undefined,
+              }, ...prev];
+            });
           }
-          return post;
-        })
-      );
-    };
-
-    const handleNewComment = (data) => {
-      setPosts((prev) =>
-        prev.map((post) => {
-          if (post.id === data.postId) {
-            return {
-              ...post,
-              commentCount: (post.commentCount || 0) + 1,
-            };
-          }
-          return post;
-        })
-      );
-    };
-
-    socket.on('new-post', handleNewPost);
-    socket.on('post-updated', handlePostUpdated);
-    socket.on('post-deleted', handlePostDeleted);
-    socket.on('post-liked', handlePostLiked);
-    socket.on('new-comment', handleNewComment);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'posts',
+        },
+        (payload) => {
+          setPosts((prev) => prev.filter((post) => post.id !== payload.old.id));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'likes',
+        },
+        (payload) => {
+          const { post_id } = payload.new;
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === post_id
+                ? { ...post, likeCount: (post.likeCount || 0) + 1 }
+                : post
+            )
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'likes',
+        },
+        (payload) => {
+          const { post_id } = payload.old;
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === post_id
+                ? { ...post, likeCount: Math.max(0, (post.likeCount || 0) - 1) }
+                : post
+            )
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'comments',
+        },
+        (payload) => {
+          const { post_id } = payload.new;
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === post_id
+                ? { ...post, commentCount: (post.commentCount || 0) + 1 }
+                : post
+            )
+          );
+        }
+      )
+      .subscribe();
 
     return () => {
-      socket.off('new-post', handleNewPost);
-      socket.off('post-updated', handlePostUpdated);
-      socket.off('post-deleted', handlePostDeleted);
-      socket.off('post-liked', handlePostLiked);
-      socket.off('new-comment', handleNewComment);
+      supabase.removeChannel(channel);
     };
-  }, [socket]);
+  }, []);
 
   const fetchPosts = async () => {
     try {
-      const response = await api.get('/posts');
-      setPosts(response.data);
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          author:profiles(id, name, avatar, email),
+          likes:likes(count),
+          comments:comments(count)
+        `)
+        .eq('is_draft', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const transformed = (data || []).map((post) => ({
+        ...post,
+        likeCount: post.likes?.[0]?.count || 0,
+        commentCount: post.comments?.[0]?.count || 0,
+        likes: undefined,
+        comments: undefined,
+      }));
+
+      setPosts(transformed);
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {
@@ -413,7 +474,7 @@ const Home = () => {
                 <GlassCard className="h-full hover:border-primary/20 transition-all duration-300 group">
                   <div className="flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-4">
-                      <Link to={`/user/${post.authorId}`} className="hover:opacity-80 transition-opacity">
+                      <Link to={`/user/${post.author_id}`} className="hover:opacity-80 transition-opacity">
                         {post.author?.avatar ? (
                           <img
                             src={post.author.avatar}
@@ -428,14 +489,14 @@ const Home = () => {
                       </Link>
                       <div className="min-w-0">
                         <Link
-                          to={`/user/${post.authorId}`}
+                          to={`/user/${post.author_id}`}
                           className="text-sm font-medium text-white hover:text-primary-400 transition-colors truncate block"
                         >
                           {post.author?.name || 'Unknown'}
                         </Link>
                         <div className="flex items-center gap-1 text-xs text-white/40">
                           <Clock className="w-3 h-3" />
-                          {formatDate(post.createdAt)}
+                          {formatDate(post.created_at)}
                         </div>
                       </div>
                     </div>

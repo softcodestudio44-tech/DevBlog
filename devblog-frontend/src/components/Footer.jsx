@@ -79,13 +79,13 @@ const Footer = () => {
                 </svg>
               </a>
               <a 
-                href="mailto:softcodestudio44@gmail.com" 
+                href="mailto:sofcodestudio44@gmail.com" 
                 className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.05] flex items-center justify-center hover:bg-primary-500/[0.08] hover:border-primary-500/20 transition-all group"
               >
                 <Mail className="w-4 h-4 text-white/30 group-hover:text-primary-400/70" />
               </a>
             </div>
-            <p className="text-xs text-white/15">softcodestudio44@gmail.com</p>
+            <p className="text-xs text-white/15">sofcodestudio44@gmail.com</p>
           </div>
         </div>
 

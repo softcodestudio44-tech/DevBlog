@@ -1,3 +1,3 @@
-const ADMIN_EMAIL = 'softcodestudio44@gmail.com';
+const ADMIN_EMAIL = 'sofcodestudio44@gmail.com';
 
 module.exports = { ADMIN_EMAIL };

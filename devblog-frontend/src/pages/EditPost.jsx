@@ -2,14 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Save, Loader2, Image, X, ArrowLeft } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { usePosts } from '../hooks/usePosts';
+import { uploadFiles } from '../lib/storage';
 import SEO from '../components/SEO';
 
 const EditPost = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { updatePost } = usePosts();
   const fileInputRef = useRef(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -27,12 +30,16 @@ const EditPost = () => {
   const fetchPost = async () => {
     try {
       setFetching(true);
-      const response = await api.get(`/posts/${id}`);
-      const post = response.data;
-      setTitle(post.title || '');
-      setContent(post.content || '');
-      setTags(post.tags ? post.tags.join(', ') : '');
-      setImages(post.images || []);
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      setTitle(data.title || '');
+      setContent(data.content || '');
+      setTags(data.tags ? data.tags.join(', ') : '');
+      setImages(data.images || []);
     } catch (err) {
       setError('Failed to load post');
       console.error('Fetch post error:', err);
@@ -46,14 +53,9 @@ const EditPost = () => {
     if (files.length === 0) return;
 
     setUploadingImages(true);
-    const formData = new FormData();
-    files.forEach((file) => formData.append('images', file));
-
     try {
-      const response = await api.post('/posts/upload-images', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setImages([...images, ...response.data.images]);
+      const urls = await uploadFiles('post-images', user?.id || 'anonymous', files);
+      setImages((prev) => [...prev, ...urls]);
     } catch (error) {
       console.error('Image upload error:', error);
       alert('Failed to upload images');
@@ -73,17 +75,19 @@ const EditPost = () => {
     setLoading(true);
     setError('');
     try {
-      await api.put(`/posts/${id}`, {
+      const { error } = await updatePost(id, {
         title,
         content,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         images,
       });
 
+      if (error) throw new Error(error);
+
       navigate(`/post/${id}`);
     } catch (err) {
       console.error('Update error:', err);
-      setError(err.response?.data?.message || 'Failed to update post');
+      setError(err.message || 'Failed to update post');
     } finally {
       setLoading(false);
     }

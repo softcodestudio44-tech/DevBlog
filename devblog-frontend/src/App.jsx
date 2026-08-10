@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { SocketProvider } from './context/SocketContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CodeParticles from './components/CodeParticles';
@@ -48,7 +47,7 @@ function AppContent() {
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route path="/betty-ai" element={<BettyAI />} />
 
-            {/* NEW: Separate Community (channels) and Messages (DMs) */}
+            {/* Separate Community (channels) and Messages (DMs) */}
             <Route path="/community" element={<Community />} />
             <Route path="/messages" element={<Messages />} />
 
@@ -66,11 +65,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <SocketProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </SocketProvider>
+      <Router>
+        <AppContent />
+      </Router>
     </AuthProvider>
   );
 }

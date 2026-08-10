@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 import GlassCard from '../components/GlassCard';
 
 const UserProfile = () => {
   const { id } = useParams();
   const { user: currentUser } = useAuth();
-  const { socket } = useSocket();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -24,33 +22,93 @@ const UserProfile = () => {
     fetchProfileData();
   }, [id]);
 
-  // Listen for real-time follow updates
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleFollowUpdate = (data) => {
-      // Refresh profile data when anyone follows/unfollows this user
-      // or when the current user follows/unfollows someone
-      if (data.followingId === id || data.followerId === id || 
-          data.followingId === currentUser?.id || data.followerId === currentUser?.id) {
-        fetchProfileData();
-      }
-    };
-
-    socket.on('follow-update', handleFollowUpdate);
-
-    return () => {
-      socket.off('follow-update', handleFollowUpdate);
-    };
-  }, [socket, id, currentUser?.id]);
-
   const fetchProfileData = async () => {
     try {
       setLoading(true);
-      const userRes = await api.get(`/users/${id}`);
-      const postsRes = await api.get(`/users/${id}/posts`);
-      setProfile(userRes.data);
-      setPosts(postsRes.data || []);
+      
+      // Fetch profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (profileError) throw profileError;
+
+      // Fetch user's posts
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          author:profiles(id, name, avatar, email),
+          likes:likes(count),
+          comments:comments(count)
+        `)
+        .eq('author_id', id)
+        .eq('is_draft', false)
+        .order('created_at', { ascending: false });
+      if (postsError) throw postsError;
+
+      // Get counts
+      const { count: postCount } = await supabase
+        .from('posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('author_id', id)
+        .eq('is_draft', false);
+
+      const { count: followersCount } = await supabase
+        .from('follows')
+        .select('id', { count: 'exact', head: true })
+        .eq('following_id', id);
+
+      const { count: followingCount } = await supabase
+        .from('follows')
+        .select('id', { count: 'exact', head: true })
+        .eq('follower_id', id);
+
+      // Check if current user follows this profile
+      let isFollowing = false;
+      if (currentUser?.id && currentUser.id !== id) {
+        const { data: followData } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', id)
+          .maybeSingle();
+        isFollowing = !!followData;
+      }
+
+      // Get followers and following lists
+      const { data: followersData } = await supabase
+        .from('follows')
+        .select('follower:profiles(id, name, avatar, email)')
+        .eq('following_id', id)
+        .limit(10);
+
+      const { data: followingData } = await supabase
+        .from('follows')
+        .select('following:profiles(id, name, avatar, email)')
+        .eq('follower_id', id)
+        .limit(10);
+
+      const transformedPosts = (postsData || []).map(post => ({
+        ...post,
+        likeCount: post.likes?.[0]?.count || 0,
+        commentCount: post.comments?.[0]?.count || 0,
+        likes: undefined,
+        comments: undefined,
+      }));
+
+      setProfile({
+        ...profileData,
+        isAdmin: profileData.email === 'sofcodestudio44@gmail.com' || profileData.role === 'admin',
+        postCount: postCount || 0,
+        followersCount: followersCount || 0,
+        followingCount: followingCount || 0,
+        isFollowing,
+        followersList: (followersData || []).map(f => f.follower),
+        followingList: (followingData || []).map(f => f.following),
+      });
+      setPosts(transformedPosts);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -64,14 +122,22 @@ const UserProfile = () => {
     setFollowLoading(true);
     try {
       if (profile.isFollowing) {
-        await api.post(`/users/${id}/unfollow`);
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', id);
+        if (error) throw error;
         setProfile(prev => ({
           ...prev,
           isFollowing: false,
           followersCount: (prev.followersCount || 0) - 1,
         }));
       } else {
-        await api.post(`/users/${id}/follow`);
+        const { error } = await supabase
+          .from('follows')
+          .insert({ follower_id: currentUser.id, following_id: id });
+        if (error) throw error;
         setProfile(prev => ({
           ...prev,
           isFollowing: true,

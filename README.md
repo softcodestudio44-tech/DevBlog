@@ -14,7 +14,7 @@ A full-stack developer blogging platform with real-time chat, AI assistant, and 
 ## Tech Stack
 
 **Frontend:** React, Vite, Tailwind CSS, Socket.IO Client  
-**Backend:** Node.js, Express, Socket.IO, Prisma, CockroachDB  
+**Backend:** Node.js, Express, Socket.IO, Prisma, neon
 **AI:** Groq API  
 **Image Upload:** Cloudinary  
 

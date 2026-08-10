@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, Loader2, Image, X } from 'lucide-react';
-import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { usePosts } from '../hooks/usePosts';
+import { uploadFiles } from '../lib/storage';
 import SEO from '../components/SEO';
 
 const CreatePost = () => {
   const { user } = useAuth();
+  const { createPost } = usePosts();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [title, setTitle] = useState('');
@@ -47,14 +49,9 @@ const CreatePost = () => {
     if (files.length === 0) return;
 
     setUploadingImages(true);
-    const formData = new FormData();
-    files.forEach((file) => formData.append('images', file));
-
     try {
-      const response = await api.post('/posts/upload-images', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setImages([...images, ...response.data.images]);
+      const urls = await uploadFiles('post-images', user?.id || 'anonymous', files);
+      setImages((prev) => [...prev, ...urls]);
     } catch (error) {
       console.error('Image upload error:', error);
       alert('Failed to upload images');
@@ -73,15 +70,17 @@ const CreatePost = () => {
 
     setLoading(true);
     try {
-      const response = await api.post('/posts', {
+      const { data, error } = await createPost({
         title,
         content,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         images,
       });
 
+      if (error) throw new Error(error);
+
       localStorage.removeItem('postDraft');
-      navigate(`/post/${response.data.post.id}`);
+      navigate(`/post/${data.id}`);
     } catch (error) {
       console.error('Publish error:', error);
       alert('Failed to publish post');

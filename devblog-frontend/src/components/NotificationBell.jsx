@@ -1,48 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bell, MessageCircle, Heart, UserPlus, AtSign, Hash, X, CheckCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import { useNotifications } from '../hooks/useNotifications';
 
 const NotificationBell = () => {
   const { user } = useAuth();
-  const { socket } = useSocket();
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const previousUnreadRef = useRef(0);
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleNewNotification = (notification) => {
-      setNotifications(prev => [notification, ...prev]);
-      setUnreadCount(prev => prev + 1);
-    };
-
-    const handleFollowUpdate = () => {
-      fetchNotifications();
-    };
-
-    socket.on('new-notification', handleNewNotification);
-    socket.on('follow-update', handleFollowUpdate);
-
-    return () => {
-      socket.off('new-notification', handleNewNotification);
-      socket.off('follow-update', handleFollowUpdate);
-    };
-  }, [socket]);
-
-  useEffect(() => {
     if (unreadCount > previousUnreadRef.current && !showDropdown) {
-      // Play a subtle sound or trigger browser notification
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('New notification on DevBlog');
       }
@@ -60,36 +31,6 @@ const NotificationBell = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get('/notifications');
-      setNotifications(res.data.notifications || []);
-      setUnreadCount(res.data.unreadCount || 0);
-    } catch (err) {
-      console.error('Failed to fetch notifications:', err);
-    }
-  };
-
-  const markAsRead = async (id) => {
-    try {
-      await api.put(`/notifications/${id}/read`);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err);
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await api.put('/notifications/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-    } catch (err) {
-      console.error('Failed to mark all as read:', err);
-    }
-  };
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -180,7 +121,7 @@ const NotificationBell = () => {
                               {notification.message}
                             </p>
                             <span className="text-[10px] text-white/30 mt-1 block">
-                              {new Date(notification.createdAt).toLocaleDateString('en-US', {
+                              {new Date(notification.created_at).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
                                 hour: '2-digit',

@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, CornerDownRight, Trash2 } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 
 const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 }) => {
   const { user, isAuthenticated } = useAuth();
@@ -17,13 +16,23 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
     if (!replyContent.trim()) return;
 
     try {
-      const response = await api.post(`/posts/${postId}/comments`, {
-        content: replyContent,
-        parentId: comment.id,
-      });
-      const newReply = response.data?.comment;
-      if (newReply && comment.replies) {
-        comment.replies.push(newReply);
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          content: replyContent,
+          post_id: postId,
+          author_id: user.id,
+          parent_id: comment.id,
+        })
+        .select(`
+          *,
+          author:profiles(id, name, avatar, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      if (data && comment.replies) {
+        comment.replies.push(data);
       }
       setReplyContent('');
       setReplying(false);
@@ -36,16 +45,20 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
   const handleDelete = async () => {
     if (!window.confirm('Delete this comment?')) return;
     try {
-      await api.delete(`/posts/${postId}/comments/${comment.id}`);
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', comment.id);
+      if (error) throw error;
       onCommentAdded();
     } catch (error) {
       console.error('Error deleting comment:', error);
     }
   };
 
-  const isCommentAuthor = user && user.id === comment.authorId;
+  const isCommentAuthor = user && user.id === comment.author_id;
   const isPostOwner = user && user.id === postAuthorId;
-  const isAdmin = user && (user.role === 'admin' || user.email === 'softcodestudio44@gmail.com');
+  const isAdmin = user && (user.role === 'admin' || user.email === 'sofcodestudio44@gmail.com');
   const canDelete = isCommentAuthor || isPostOwner || isAdmin;
 
   return (
@@ -55,7 +68,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
       className={`${depth > 0 ? 'ml-8 border-l-2 border-primary/20 pl-4' : ''}`}
     >
       <div className="flex gap-3 mb-3">
-        <Link to={`/user/${comment.authorId}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+        <Link to={`/user/${comment.author_id}`} className="flex-shrink-0 hover:opacity-80 transition-opacity">
           {comment.author && comment.author.avatar ? (
             <img 
               src={comment.author.avatar} 
@@ -71,7 +84,7 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
         <div className="flex-grow min-w-0">
           <div className="glass p-3 rounded-2xl rounded-tl-none">
             <div className="flex items-center justify-between mb-1">
-              <Link to={`/user/${comment.authorId}`} className="text-sm font-medium text-primary-300 hover:text-white transition-colors truncate">
+              <Link to={`/user/${comment.author_id}`} className="text-sm font-medium text-primary-300 hover:text-white transition-colors truncate">
                 {comment.author && comment.author.name ? comment.author.name : 'Unknown'}
               </Link>
               {canDelete && (
@@ -152,15 +165,32 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
 
 const CommentSection = ({ postId, postAuthorId }) => {
   const { user, isAuthenticated } = useAuth();
-  const { socket } = useSocket();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
 
   const fetchComments = async () => {
     try {
-      const response = await api.get(`/posts/${postId}/comments`);
-      setComments(response.data || []);
+      const { data, error } = await supabase
+        .from('comments')
+        .select(`
+          *,
+          author:profiles(id, name, avatar, email),
+          replies:comments(
+            *,
+            author:profiles(id, name, avatar, email),
+            replies:comments(
+              *,
+              author:profiles(id, name, avatar, email)
+            )
+          )
+        `)
+        .eq('post_id', postId)
+        .is('parent_id', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setComments(data || []);
     } catch (error) {
       console.error('Error fetching comments:', error);
       setComments([]);
@@ -173,48 +203,78 @@ const CommentSection = ({ postId, postAuthorId }) => {
     }
   }, [postId]);
 
-  // Socket listener - skip own comments to avoid duplicates
+  // Subscribe to new comments in real-time
   useEffect(() => {
-    if (!socket || !postId) return;
+    if (!postId) return;
 
-    const handleNewComment = (data) => {
-      // Skip the current user's comments (they're already added optimistically)
-      if (data.comment && data.comment.authorId === user?.id) return;
+    const channel = supabase
+      .channel(`comments:${postId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'comments',
+          filter: `post_id=eq.${postId}`,
+        },
+        async (payload) => {
+          const newComment = payload.new;
+          
+          // Skip own comments (already added optimistically)
+          if (newComment.author_id === user?.id) return;
 
-      if (data.postId === postId && data.comment) {
-        setComments((prev) => {
-          // If it's a reply, find parent and add to replies
-          if (data.comment.parentId) {
-            return prev.map((c) => {
-              if (c.id === data.comment.parentId) {
-                // Avoid duplicate reply
-                if (c.replies?.find(r => r.id === data.comment.id)) return c;
-                return { ...c, replies: [...(c.replies || []), data.comment] };
-              }
-              return c;
-            });
-          }
-          // Top-level comment - avoid duplicates
-          if (prev.find((c) => c.id === data.comment.id)) return prev;
-          return [data.comment, ...prev];
-        });
-      }
-    };
+          // Fetch the full comment with author info
+          const { data } = await supabase
+            .from('comments')
+            .select(`
+              *,
+              author:profiles(id, name, avatar, email),
+              replies:comments(
+                *,
+                author:profiles(id, name, avatar, email)
+              )
+            `)
+            .eq('id', newComment.id)
+            .single();
 
-    const handleCommentDeleted = (data) => {
-      if (data.postId === postId) {
-        setComments((prev) => prev.filter((c) => c.id !== data.commentId));
-      }
-    };
+          if (!data) return;
 
-    socket.on('new-comment', handleNewComment);
-    socket.on('comment-deleted', handleCommentDeleted);
+          setComments((prev) => {
+            // If it's a reply, find parent and add to replies
+            if (data.parent_id) {
+              return prev.map((c) => {
+                if (c.id === data.parent_id) {
+                  if (c.replies?.find(r => r.id === data.id)) return c;
+                  return { ...c, replies: [...(c.replies || []), data] };
+                }
+                return c;
+              });
+            }
+            // Top-level comment - avoid duplicates
+            if (prev.find((c) => c.id === data.id)) return prev;
+            return [data, ...prev];
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'comments',
+          filter: `post_id=eq.${postId}`,
+        },
+        (payload) => {
+          const { id } = payload.old;
+          setComments((prev) => prev.filter((c) => c.id !== id));
+        }
+      )
+      .subscribe();
 
     return () => {
-      socket.off('new-comment', handleNewComment);
-      socket.off('comment-deleted', handleCommentDeleted);
+      supabase.removeChannel(channel);
     };
-  }, [socket, postId, user?.id]);
+  }, [postId, user?.id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -224,9 +284,9 @@ const CommentSection = ({ postId, postAuthorId }) => {
     const optimisticComment = {
       id: tempId,
       content: newComment,
-      authorId: user.id,
+      author_id: user.id,
       author: { id: user.id, name: user.name, avatar: user.avatar },
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
       replies: [],
     };
 
@@ -235,11 +295,23 @@ const CommentSection = ({ postId, postAuthorId }) => {
     setLoading(true);
 
     try {
-      const response = await api.post(`/posts/${postId}/comments`, { content: optimisticComment.content });
-      const realComment = response.data?.comment;
-      if (realComment) {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          content: optimisticComment.content,
+          post_id: postId,
+          author_id: user.id,
+        })
+        .select(`
+          *,
+          author:profiles(id, name, avatar, email)
+        `)
+        .single();
+
+      if (error) throw error;
+      if (data) {
         setComments((prev) =>
-          prev.map((c) => (c.id === tempId ? { ...realComment, replies: [] } : c))
+          prev.map((c) => (c.id === tempId ? { ...data, replies: [] } : c))
         );
       }
     } catch (error) {

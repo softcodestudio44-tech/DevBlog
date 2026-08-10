@@ -2,11 +2,11 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { User, Camera, Save, ArrowLeft, Upload, X, Github, Twitter, Linkedin, Globe, Music2, Facebook } from 'lucide-react';
-import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { uploadAvatar } from '../lib/storage';
 
 const EditProfile = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
@@ -32,11 +32,11 @@ const EditProfile = () => {
     setError('');
 
     try {
-      const response = await api.put('/users/profile', formData);
-      updateUser(response.data.user);
-      navigate(`/user/${user.id}`);
+      const { error: updateError } = await updateProfile(formData);
+      if (updateError) throw new Error(updateError);
+      navigate(`/user/${user?.id}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Update failed');
+      setError(err.message || 'Update failed');
     } finally {
       setLoading(false);
     }
@@ -63,21 +63,15 @@ const EditProfile = () => {
     setUploadLoading(true);
     setError('');
 
-    const uploadData = new FormData();
-    uploadData.append('avatar', file);
-
     try {
-      // FIXED: Changed from /users/upload-avatar to /users/avatar to match backend route
-      const response = await api.post('/users/avatar', uploadData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      setFormData({ ...formData, avatar: response.data.user.avatar });
-      setPreviewUrl(response.data.user.avatar);
-      updateUser(response.data.user);
+      if (!user?.id) throw new Error('Not authenticated');
+      const url = await uploadAvatar(user.id, file);
+      setFormData((prev) => ({ ...prev, avatar: url }));
+      setPreviewUrl(url);
+      await updateProfile({ avatar: url });
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err.response?.data?.message || 'Upload failed. Please try again.');
+      setError(err.message || 'Upload failed. Please try again.');
       setPreviewUrl(user?.avatar || '');
     } finally {
       setUploadLoading(false);
@@ -85,9 +79,10 @@ const EditProfile = () => {
   };
 
   const handleRemoveAvatar = () => {
-    setFormData({ ...formData, avatar: '' });
+    setFormData((prev) => ({ ...prev, avatar: '' }));
     setPreviewUrl('');
-    fileInputRef.current.value = '';
+    updateProfile({ avatar: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const avatarOptions = [
@@ -206,6 +201,7 @@ const EditProfile = () => {
                   onClick={() => {
                     setFormData({ ...formData, avatar });
                     setPreviewUrl(avatar);
+                    updateProfile({ avatar });
                   }}
                   className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
                     formData.avatar === avatar
@@ -220,6 +216,7 @@ const EditProfile = () => {
                 onClick={() => {
                   setFormData({ ...formData, avatar: '' });
                   setPreviewUrl('');
+                  updateProfile({ avatar: '' });
                 }}
                 className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all ${
                   !formData.avatar

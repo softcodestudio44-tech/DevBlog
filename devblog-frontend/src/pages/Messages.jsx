@@ -1,52 +1,28 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  MessageCircle, Send, Users, Hash, Menu, X, ArrowLeft, 
-  Trash2, Paperclip, Mic, CheckCheck, MoreVertical, Phone, Video,
-  Search, UserX, CornerUpLeft
+  MessageCircle, Send, Users, Menu, X, 
+  Trash2, Paperclip, MoreVertical, Search, CornerUpLeft
 } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import { useDirectMessages } from '../hooks/useDirectMessages';
 
-const DM_HISTORY_KEY = 'devblog-dm-history';
 const DM_ACTIVE_USER_KEY = 'devblog-dm-active-user';
-const DM_MESSAGES_KEY = 'devblog-dm-messages';
 
 const Messages = () => {
   const { user, isAuthenticated } = useAuth();
-  const { socket, onlineUsers, presence, typingUsers, joinRoom, leaveRoom, setTyping, connected } = useSocket();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  const [dmHistory, setDmHistory] = useState(() => {
-    try {
-      const cached = localStorage.getItem(DM_HISTORY_KEY);
-      return cached ? JSON.parse(cached) : [];
-    } catch (err) {
-      return [];
-    }
-  });
+  const [dmHistory, setDmHistory] = useState([]);
   const [activeDMUser, setActiveDMUser] = useState(() => {
     try {
       const cached = localStorage.getItem(DM_ACTIVE_USER_KEY);
       return cached ? JSON.parse(cached) : null;
     } catch (err) {
       return null;
-    }
-  });
-  const [dmMessages, setDmMessages] = useState(() => {
-    try {
-      const cachedActive = localStorage.getItem(DM_ACTIVE_USER_KEY);
-      const active = cachedActive ? JSON.parse(cachedActive) : null;
-      if (active?.id) {
-        const cached = localStorage.getItem(`${DM_MESSAGES_KEY}:${active.id}`);
-        return cached ? JSON.parse(cached) : [];
-      }
-      return [];
-    } catch (err) {
-      return [];
     }
   });
   const [newMessage, setNewMessage] = useState('');
@@ -57,16 +33,44 @@ const Messages = () => {
   
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
-  const typingTimerRef = useRef(null);
-  const processedDMessagesRef = useRef(new Set());
 
-  const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
-  const otherOnlineUsers = onlineUsers.filter(u => u.id !== user?.id);
+  const isAdmin = user?.email === 'sofcodestudio44@gmail.com' || user?.role === 'admin';
 
-  // Fetch DM history on mount
+  // Use the DMs hook with the active other user
+  const { 
+    messages: dmMessages, 
+    sendMessage: sendDM, 
+    deleteMessage: deleteDM, 
+    markAsRead,
+    loading: dmLoading 
+  } = useDirectMessages(activeDMUser?.id);
+
+  // Fetch all profiles as potential DM partners
   useEffect(() => {
     fetchDMHistory();
   }, []);
+
+  const fetchDMHistory = async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, avatar, email')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      
+      const partnerIds = (data || []).filter(u => u.id !== user?.id);
+      setDmHistory(partnerIds);
+      setLoading(false);
+    } catch (err) { 
+      console.error('Error fetching profiles:', err);
+      setLoading(false);
+    }
+  };
 
   // Handle URL param for starting DM
   useEffect(() => {
@@ -81,233 +85,38 @@ const Messages = () => {
     navigate(`${window.location.pathname}${query ? `?${query}` : ''}`, { replace: true });
   }, [searchParams, isAuthenticated, user, navigate]);
 
-  // Socket listeners for DMs
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleNewDM = (message) => {
-      // If this is our own message, replace the temp message
-      if (message.authorId === user?.id) {
-        setDmMessages(prev => {
-          const tempIndex = prev.findIndex(m => m.id.startsWith('temp-') && m.authorId === message.authorId && m.content === message.content);
-          if (tempIndex >= 0) {
-            const updated = [...prev];
-            updated[tempIndex] = { ...message, deliveryStatus: 'Delivered' };
-            return updated;
-          }
-          return prev;
-        });
-        return;
-      }
-
-      if (processedDMessagesRef.current.has(message.id)) return;
-      processedDMessagesRef.current.add(message.id);
-
-      const normalizedMessage = {
-        ...message,
-        deliveryStatus: message.readAt ? 'Read' : undefined,
-      };
-      
-      // Update DM history sidebar
-      setDmHistory(prev => {
-        const fromId = message.authorId;
-        const existingIndex = prev.findIndex(u => u.id === fromId);
-        const newEntry = {
-          id: fromId,
-          name: message.author?.name,
-          avatar: message.author?.avatar,
-          lastMessage: message.content,
-          lastMessageAt: message.createdAt,
-        };
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = newEntry;
-          const [item] = updated.splice(existingIndex, 1);
-          return [item, ...updated];
-        }
-        return [newEntry, ...prev];
-      });
-
-      const activeRoomName = activeDMUserRef.current
-        ? `dm:${[user?.id, activeDMUserRef.current.id].sort().join(':')}`
-        : null;
-      if (!activeRoomName || message.roomName !== activeRoomName) return;
-
-      setDmMessages(prev => {
-        if (prev.some(m => m.id === message.id)) return prev;
-        return [...prev, normalizedMessage];
-      });
-    };
-
-    const handleMessageDeleted = ({ messageId }) => {
-      if (!messageId) return;
-      setDmMessages(prev => prev.filter(msg => msg.id !== messageId));
-    };
-
-    const handleMessagesRead = ({ roomName, messageIds }) => {
-      if (!roomName || !messageIds?.length) return;
-      setDmMessages(prev => prev.map(msg => (messageIds.includes(msg.id) ? { ...msg, readAt: new Date().toISOString(), deliveryStatus: 'Read' } : msg)));
-    };
-
-    socket.on('new-dm', handleNewDM);
-    socket.on('message-deleted', handleMessageDeleted);
-    socket.on('messages-read', handleMessagesRead);
-
-    return () => {
-      socket.off('new-dm', handleNewDM);
-      socket.off('message-deleted', handleMessageDeleted);
-      socket.off('messages-read', handleMessagesRead);
-    };
-  }, [socket, user]);
-
-  // Ref for active DM user in socket callbacks
-  const activeDMUserRef = useRef(activeDMUser);
-  useEffect(() => { activeDMUserRef.current = activeDMUser; }, [activeDMUser]);
-
-  // Refresh messages on reconnect
-  useEffect(() => {
-    if (!socket || !connected || !activeDMUser) return;
-    
-    const refreshMessages = async () => {
-      try {
-        const sorted = [user.id, activeDMUser.id].sort();
-        const roomName = `dm:${sorted[0]}:${sorted[1]}`;
-        const res = await api.get(`/chat/rooms/${roomName}/messages`);
-        setDmMessages(res.data || []);
-        processedDMessagesRef.current.clear();
-        res.data?.forEach(m => processedDMessagesRef.current.add(m.id));
-      } catch (err) {
-        console.error('Failed to refresh DM messages:', err);
-      }
-    };
-    
-    refreshMessages();
-  }, [connected, activeDMUser, user]);
-
-  // Auto-scroll
-  useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-  }, [dmMessages]);
-
-  const fetchDMHistory = async () => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const res = await api.get('/chat/dm-history');
-      const filtered = (res.data || []).filter(u => u.id !== user?.id);
-      setDmHistory(filtered);
-      setLoading(false);
-    } catch (err) { 
-      console.error(err);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated || !user || activeDMUser || dmHistory.length === 0) return;
-    const cachedActive = localStorage.getItem(DM_ACTIVE_USER_KEY);
-    if (!cachedActive) return;
-    try {
-      const active = JSON.parse(cachedActive);
-      if (active?.id && dmHistory.some(d => d.id === active.id)) {
-        startDM(active);
-      }
-    } catch (err) {
-      console.error('Failed to restore active DM from cache:', err);
-    }
-  }, [isAuthenticated, user, activeDMUser, dmHistory]);
-
-  const markRoomAsRead = useCallback(async (roomName) => {
-    if (!roomName || !socket?.connected || !user?.id) return;
-    try {
-      socket.emit('mark-as-read', { roomName });
-      await api.post('/chat/messages/read', { roomName });
-    } catch (err) {
-      console.error('Failed to mark messages as read:', err);
-    }
-  }, [socket, user?.id]);
-
   const startDM = async (targetUser) => {
     if (!targetUser || targetUser.id === user?.id) return;
-
-    if (activeDMUser?.id && activeDMUser.id !== targetUser.id) {
-      // Leave the previous DM room before joining a new one so the socket
-      // doesn't stay subscribed to stale direct-message rooms on reconnect.
-      const previousRoom = `dm:${[user.id, activeDMUser.id].sort().join(':')}`;
-      leaveRoom(previousRoom);
-    }
-    
     setActiveDMUser(targetUser);
     setReplyTo(null);
     setShowSidebar(false);
+    localStorage.setItem(DM_ACTIVE_USER_KEY, JSON.stringify(targetUser));
     
-    const sorted = [user.id, targetUser.id].sort();
-    const roomName = `dm:${sorted[0]}:${sorted[1]}`;
-    joinRoom(roomName);
-    
-    try {
-      const res = await api.get(`/chat/rooms/${roomName}/messages`);
-      const messageList = Array.isArray(res.data) ? res.data : [];
-      setDmMessages(messageList);
-      processedDMessagesRef.current.clear();
-      messageList.forEach(m => processedDMessagesRef.current.add(m.id));
-      await markRoomAsRead(roomName);
-    } catch (err) { 
-      setDmMessages([]);
-    }
+    // Mark messages as read when opening a conversation
+    setTimeout(() => markAsRead(), 300);
   };
 
   const openDMUserById = useCallback(async (targetUserId) => {
     if (!targetUserId || !user?.id || targetUserId === user.id) return;
     try {
-      const res = await api.get(`/users/${targetUserId}`);
-      const targetUser = {
-        id: res.data.id,
-        name: res.data.name,
-        avatar: res.data.avatar,
-      };
-      await startDM(targetUser);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, avatar, email, bio')
+        .eq('id', targetUserId)
+        .single();
+      if (error) throw error;
+      if (data) startDM(data);
     } catch (err) {
       console.error('Failed to open DM from query params:', err);
     }
   }, [user?.id]);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (!activeDMUser?.id) return;
-    try {
-      localStorage.setItem(DM_ACTIVE_USER_KEY, JSON.stringify(activeDMUser));
-    } catch (err) {
-      console.error('Failed to save active DM user:', err);
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [activeDMUser]);
-
-  useEffect(() => {
-    if (!activeDMUser?.id) return;
-    try {
-      localStorage.setItem(`${DM_MESSAGES_KEY}:${activeDMUser.id}`, JSON.stringify(dmMessages));
-    } catch (err) {
-      console.error('Failed to save DM messages:', err);
-    }
-  }, [activeDMUser, dmMessages]);
-
-  useEffect(() => {
-    if (!activeDMUser?.id || !user?.id || !socket?.connected) return;
-    const sorted = [user.id, activeDMUser.id].sort();
-    const roomName = `dm:${sorted[0]}:${sorted[1]}`;
-    markRoomAsRead(roomName);
-  }, [activeDMUser, socket?.connected, user?.id, markRoomAsRead]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(DM_HISTORY_KEY, JSON.stringify(dmHistory));
-    } catch (err) {
-      console.error('Failed to save DM history:', err);
-    }
-  }, [dmHistory]);
+  }, [dmMessages]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -321,73 +130,15 @@ const Messages = () => {
     const content = replyTo
       ? `> ${replyTo.content}\n\n${newMessage.trim()}`
       : newMessage.trim();
-    const tempId = `temp-${Date.now()}`;
 
-    const optimisticMessage = {
-      id: tempId,
-      content: content,
-      authorId: user.id,
-      author: { id: user.id, name: user.name, avatar: user.avatar },
-      createdAt: new Date().toISOString(),
-    };
-    setDmMessages(prev => [...prev, optimisticMessage]);
-    
-    setDmHistory(prev => {
-      const existingIndex = prev.findIndex(u => u.id === activeDMUser.id);
-      const newEntry = {
-        id: activeDMUser.id,
-        name: activeDMUser.name,
-        avatar: activeDMUser.avatar,
-        lastMessage: content,
-        lastMessageAt: new Date().toISOString(),
-      };
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = newEntry;
-        const [item] = updated.splice(existingIndex, 1);
-        return [item, ...updated];
-      }
-      return [newEntry, ...prev];
-    });
-    
+    await sendDM(content);
     setNewMessage('');
     setReplyTo(null);
     if (inputRef.current) inputRef.current.focus();
-
-    try {
-      if (!socket?.connected) {
-        const res = await api.post('/chat/dm', {
-          recipientId: activeDMUser.id,
-          content,
-        });
-        const deliveredMessage = res.data;
-        setDmMessages(prev => prev.map(msg => (msg.id === tempId ? deliveredMessage : msg)));
-        return;
-      }
-
-      socket.emit('send-dm', {
-        recipientId: activeDMUser.id,
-        content,
-      });
-    } catch (err) {
-      console.error('Failed to send DM:', err);
-      setDmMessages(prev => prev.filter(msg => msg.id !== tempId));
-    }
-  };
-
-  const handleTyping = (e) => {
-    setNewMessage(e.target.value);
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    if (activeDMUser) {
-      const sorted = [user.id, activeDMUser.id].sort();
-      const roomName = `dm:${sorted[0]}:${sorted[1]}`;
-      setTyping(roomName, true);
-      typingTimerRef.current = setTimeout(() => setTyping(roomName, false), 1200);
-    }
   };
 
   const handleReplyToMessage = (message) => {
-    setReplyTo({ id: message.id, authorName: message.author?.name || 'Message', content: message.content });
+    setReplyTo({ id: message.id, authorName: message.sender?.name || 'Message', content: message.content });
     if (inputRef.current) inputRef.current.focus();
   };
 
@@ -397,36 +148,13 @@ const Messages = () => {
     if (!messageId) return;
     if (!window.confirm('Delete this message?')) return;
     try {
-      await api.delete(`/chat/messages/${messageId}`);
-      setDmMessages(prev => prev.filter(msg => msg.id !== messageId));
+      await deleteDM(messageId);
     } catch (err) {
       console.error('Delete message failed:', err);
     }
   };
 
   const formatTime = (dateStr) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const formatRelativeTime = (dateStr) => {
-    const diffMinutes = Math.round((Date.now() - new Date(dateStr).getTime()) / 60000);
-    if (diffMinutes < 1) return 'just now';
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    const diffHours = Math.round(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.round(diffHours / 24);
-    return `${diffDays}d ago`;
-  };
-  const isUserOnline = (uid) => Boolean(presence?.[uid]?.online || onlineUsers.some(u => u.id === uid));
-  const getPresenceLabel = (uid) => {
-    const state = presence?.[uid];
-    if (state?.online) return 'Online';
-    if (state?.lastSeen) return `Last seen ${formatRelativeTime(state.lastSeen)}`;
-    return 'Offline';
-  };
-  const getMessageStatusText = (msg) => {
-    if (msg.authorId !== user?.id) return null;
-    if (msg.readAt || msg.deliveryStatus === 'Read') return 'Read';
-    if (msg.deliveryStatus === 'Delivered' || msg.deliveryStatus === 'Sent') return msg.deliveryStatus;
-    return 'Delivered';
-  };
 
   if (loading) {
     return (
@@ -436,34 +164,12 @@ const Messages = () => {
     );
   }
 
-  // Filter out self from online users for "Start new conversation"
-  const newConversations = otherOnlineUsers.filter(u => !dmHistory.find(d => d.id === u.id));
-
   return (
     <div className="flex h-[calc(100vh-64px)] bg-[#030405] overflow-hidden relative">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-primary/[0.03] blur-3xl animate-pulse" style={{animationDuration: '8s'}} />
         <div className="absolute bottom-[15%] left-[5%] w-[350px] h-[350px] rounded-full bg-primary/[0.02] blur-3xl animate-pulse" style={{animationDuration: '12s'}} />
-        <div className="absolute top-[35%] left-[25%] w-[180px] h-[180px] rounded-full bg-primary-400/[0.02] blur-2xl animate-pulse" style={{animationDuration: '6s'}} />
-        <div className="absolute top-[60%] right-[30%] w-[250px] h-[250px] rounded-full bg-purple-500/[0.015] blur-3xl animate-pulse" style={{animationDuration: '10s'}} />
-        
-        <div className="code-particle" style={{left: '8%', animationDelay: '0s', animationDuration: '18s'}}>{'{ }'}</div>
-        <div className="code-particle" style={{left: '22%', animationDelay: '3s', animationDuration: '22s'}}>{'</>'}</div>
-        <div className="code-particle" style={{left: '38%', animationDelay: '7s', animationDuration: '20s'}}>{'=>;'}</div>
-        <div className="code-particle" style={{left: '55%', animationDelay: '2s', animationDuration: '25s'}}>{'[]'}</div>
-        <div className="code-particle" style={{left: '70%', animationDelay: '5s', animationDuration: '19s'}}>{'()'}</div>
-        <div className="code-particle" style={{left: '85%', animationDelay: '9s', animationDuration: '21s'}}>{'&&'}</div>
-        <div className="code-particle" style={{left: '15%', animationDelay: '12s', animationDuration: '23s'}}>{'++'}</div>
-        <div className="code-particle" style={{left: '45%', animationDelay: '15s', animationDuration: '17s'}}>{'==='}</div>
-        <div className="code-particle" style={{left: '65%', animationDelay: '4s', animationDuration: '24s'}}>{'!!'}</div>
-        <div className="code-particle" style={{left: '92%', animationDelay: '11s', animationDuration: '20s'}}>{'??'}</div>
-        
-        <div className="absolute top-[10%] left-[15%] w-1 h-1 rounded-full bg-white/20 animate-pulse" />
-        <div className="absolute top-[25%] left-[60%] w-0.5 h-0.5 rounded-full bg-white/30 animate-pulse" style={{animationDelay: '1s'}} />
-        <div className="absolute top-[45%] left-[80%] w-1 h-1 rounded-full bg-primary-400/20 animate-pulse" style={{animationDelay: '2s'}} />
-        <div className="absolute top-[70%] left-[20%] w-0.5 h-0.5 rounded-full bg-white/25 animate-pulse" style={{animationDelay: '3s'}} />
-        <div className="absolute top-[85%] left-[50%] w-1 h-1 rounded-full bg-primary-400/20 animate-pulse" style={{animationDelay: '1.5s'}} />
       </div>
 
       {showSidebar && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowSidebar(false)} />}
@@ -489,15 +195,15 @@ const Messages = () => {
                 <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="font-bold text-white text-sm">Recent conversations</h2>
-                <p className="text-xs text-primary-300/70">{dmHistory.length} chats</p>
+                <h2 className="font-bold text-white text-sm">People</h2>
+                <p className="text-xs text-primary-300/70">{dmHistory.length} members</p>
               </div>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
               <input
                 type="text"
-                placeholder="Search messages..."
+                placeholder="Search people..."
                 className="w-full bg-white/[0.03] border border-white/[0.06] rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/30"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -506,11 +212,9 @@ const Messages = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {/* Conversations */}
             <div className="p-3 space-y-1">
-              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">RECENT</p>
+              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">ALL MEMBERS</p>
               {dmHistory.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
-                const online = isUserOnline(u.id);
                 const isActive = activeDMUser?.id === u.id;
                 return (
                   <button
@@ -531,17 +235,11 @@ const Messages = () => {
                             </div>
                           )}
                         </div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0f0d] ${
-                          online ? 'bg-primary' : 'bg-white/20'
-                        }`} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
-                          {u.lastMessageAt && <span className="text-[10px] text-white/30 ml-2">{formatTime(u.lastMessageAt)}</span>}
-                        </div>
+                        <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
                         <span className="text-[12px] text-white/50 truncate block">
-                          {u.lastMessage ? u.lastMessage.substring(0, 35) : (online ? 'Online' : 'Offline')}
+                          {u.email}
                         </span>
                       </div>
                     </div>
@@ -550,44 +248,10 @@ const Messages = () => {
               })}
             </div>
 
-            {/* Start new conversations */}
-            {newConversations.length > 0 && (
-              <div className="p-3 space-y-1 border-t border-white/10">
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">START NEW CHAT</p>
-                {newConversations.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
-                  <button
-                    key={u.id}
-                    onClick={() => startDM(u)}
-                    className="w-full text-left p-3 rounded-3xl glass hover:bg-white/10 transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-11 h-11 rounded-full overflow-hidden">
-                          {u.avatar ? (
-                            <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-800 flex items-center justify-center text-sm font-bold text-white">
-                              {u.name?.[0]}
-                            </div>
-                          )}
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0f0d] bg-primary" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
-                        <span className="text-[12px] text-primary-400/60 truncate block">Tap to start chatting</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {dmHistory.length === 0 && newConversations.length === 0 && (
+            {dmHistory.length === 0 && (
               <div className="glass p-8 text-center">
                 <MessageCircle className="w-10 h-10 text-white/20 mx-auto mb-3" />
-                <p className="text-sm text-white/40">No conversations yet.</p>
-                <p className="text-xs text-white/25 mt-1">No one is online right now.</p>
+                <p className="text-sm text-white/40">No members to message yet.</p>
               </div>
             )}
           </div>
@@ -596,9 +260,9 @@ const Messages = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative z-10 w-full overflow-hidden">
-        {!connected && (
-          <div className="absolute inset-x-0 top-0 z-30 bg-amber-500/10 text-amber-200 text-center py-1 text-[11px] border-b border-amber-500/20">
-            Reconnecting chat... updates will arrive shortly.
+        {dmLoading && (
+          <div className="absolute inset-x-0 top-0 z-30 bg-primary/10 text-primary-200 text-center py-1 text-[11px] border-b border-primary/20">
+            Loading messages...
           </div>
         )}
         
@@ -613,7 +277,7 @@ const Messages = () => {
             </div>
             <div>
               <h3 className="font-semibold text-white text-sm">Messages</h3>
-              <p className="text-xs text-white/40">Select a conversation</p>
+              <p className="text-xs text-white/40">Select a person to chat with</p>
             </div>
           </div>
         ) : (
@@ -629,25 +293,14 @@ const Messages = () => {
                   {activeDMUser.name?.[0]}
                 </div>
               )}
-              <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0a0f0d] ${
-                isUserOnline(activeDMUser.id) ? 'bg-primary' : 'bg-white/20'
-              }`} />
             </Link>
             <div className="min-w-0 flex-1">
               <Link to={`/user/${activeDMUser.id}`} className="font-semibold text-white text-sm hover:text-primary-300 block truncate">
                 {activeDMUser.name}
               </Link>
-              <p className="text-xs text-primary-400/50">
-                {getPresenceLabel(activeDMUser.id)}
-              </p>
+              <p className="text-xs text-primary-400/50">Direct message</p>
             </div>
             <div className="flex items-center gap-1">
-              <button className="p-2 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
-                <Phone className="w-4 h-4" />
-              </button>
-              <button className="p-2 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
-                <Video className="w-4 h-4" />
-              </button>
               <button className="p-2 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -665,12 +318,11 @@ const Messages = () => {
                     <p className="text-xs uppercase tracking-[0.2em] text-primary-300/70">Direct message</p>
                     <h2 className="text-lg font-semibold text-white">{activeDMUser.name}</h2>
                   </div>
-                  <div className="text-xs text-white/50">DM history</div>
                 </div>
               </div>
             )}
             
-            {dmMessages.length === 0 && activeDMUser && (
+            {dmMessages.length === 0 && activeDMUser && !dmLoading && (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <div className="w-20 h-20 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center mb-4">
                   <MessageCircle className="w-10 h-10 text-primary-400/20" />
@@ -680,36 +332,26 @@ const Messages = () => {
               </div>
             )}
             
-            {activeDMUser && typingUsers[activeDMUser.id] && (
-              <div className="mb-3 flex items-center gap-2 rounded-2xl border border-primary/10 bg-primary/10 px-4 py-3 text-sm text-primary-200">
-                <div className="flex items-center gap-1">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-primary-400" style={{ animationDelay: '0ms' }} />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-primary-400" style={{ animationDelay: '120ms' }} />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-primary-400" style={{ animationDelay: '240ms' }} />
-                </div>
-                <span>{typingUsers[activeDMUser.id]} is typing...</span>
-              </div>
-            )}
-
             {dmMessages.map((msg, idx) => {
-              const isOwn = msg.authorId === user?.id;
+              const isOwn = msg.sender_id === user?.id;
               const prevMsg = dmMessages[idx - 1];
               const nextMsg = dmMessages[idx + 1];
-              const showTime = !nextMsg || nextMsg.authorId !== msg.authorId ||
-                (new Date(nextMsg.createdAt) - new Date(msg.createdAt)) > 300000;
-              const isFirstInGroup = !prevMsg || prevMsg.authorId !== msg.authorId;
+              const showTime = !nextMsg || nextMsg.sender_id !== msg.sender_id ||
+                (new Date(nextMsg.created_at) - new Date(msg.created_at)) > 300000;
+              const isFirstInGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
               const canDelete = isOwn || isAdmin;
+              const author = msg.sender || (msg.sender_id === user?.id ? { name: user.name, avatar: user.avatar } : { name: activeDMUser?.name, avatar: activeDMUser?.avatar });
 
               return (
                 <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-3' : 'mt-0.5'}`}>
                   <div className={`flex gap-2 max-w-[75%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
                     {isFirstInGroup && !isOwn && (
-                      <Link to={`/user/${msg.authorId}`} className="flex-shrink-0 self-end mb-1">
-                        {msg.author?.avatar ? (
-                          <img src={msg.author.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
+                      <Link to={`/user/${msg.sender_id}`} className="flex-shrink-0 self-end mb-1">
+                        {author?.avatar ? (
+                          <img src={author.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
                         ) : (
                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-700 to-primary-800 flex items-center justify-center text-[10px] font-bold text-white">
-                            {msg.author?.name?.[0] || 'U'}
+                            {author?.name?.[0] || 'U'}
                           </div>
                         )}
                       </Link>
@@ -724,7 +366,6 @@ const Messages = () => {
                       }`}>
                         <MarkdownRenderer content={msg.content} />
                       </div>
-                      {/* HOVER ACTION BUTTONS - SAME AS YOUR SCREENSHOT */}
                       <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
                           <CornerUpLeft className="w-4 h-4" />
@@ -737,12 +378,7 @@ const Messages = () => {
                       </div>
                       {showTime && (
                         <span className={`text-[10px] text-white/30 mt-1 ${isOwn ? 'mr-1' : 'ml-1'}`}>
-                          {formatTime(msg.createdAt)}
-                          {isOwn && (
-                            <span className={`ml-1 ${msg.readAt || msg.deliveryStatus === 'Read' ? 'text-primary-400' : 'text-white/20'}`}>
-                              {getMessageStatusText(msg)}
-                            </span>
-                          )}
+                          {formatTime(msg.created_at)}
                         </span>
                       )}
                     </div>
@@ -756,7 +392,6 @@ const Messages = () => {
         {/* Input */}
         {isAuthenticated ? (
           <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
-            {/* REPLY PREVIEW - SAME AS YOUR SCREENSHOT */}
             {replyTo && (
               <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5">
                 <div className="flex items-start justify-between gap-3">
@@ -781,7 +416,7 @@ const Messages = () => {
                   placeholder={activeDMUser ? `Message ${activeDMUser.name}...` : 'Select a conversation...'}
                   className="w-full bg-white/[0.04] border border-white/[0.06] rounded-full px-5 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/30 focus:bg-white/[0.06] transition-all"
                   value={newMessage}
-                  onChange={handleTyping}
+                  onChange={(e) => setNewMessage(e.target.value)}
                   disabled={!activeDMUser}
                 />
               </div>

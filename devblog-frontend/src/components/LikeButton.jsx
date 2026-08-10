@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 
 const LikeButton = ({ postId, initialCount = 0 }) => {
-  const { isAuthenticated } = useAuth();
-  const { socket } = useSocket();
+  const { user, isAuthenticated } = useAuth();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
@@ -20,28 +18,68 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
     fetchLikeStatus();
   }, [postId]);
 
-  // Listen for external like events (other users liking this post)
+  // Subscribe to real-time like changes
   useEffect(() => {
-    if (!socket || !postId) return;
+    if (!postId) return;
 
-    const handlePostLiked = (data) => {
-      if (data.postId === postId && data.userId !== user?.id) {
-        // Only update count from socket if it's NOT our own action
-        setCount((prev) =>
-          data.action === 'like' ? prev + 1 : Math.max(0, prev - 1)
-        );
-      }
+    const channel = supabase
+      .channel(`likes:${postId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'likes',
+          filter: `post_id=eq.${postId}`,
+        },
+        (payload) => {
+          if (payload.new.user_id !== user?.id) {
+            setCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'likes',
+          filter: `post_id=eq.${postId}`,
+        },
+        (payload) => {
+          if (payload.old.user_id !== user?.id) {
+            setCount((prev) => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
-
-    socket.on('post-liked', handlePostLiked);
-    return () => socket.off('post-liked', handlePostLiked);
-  }, [socket, postId]);
+  }, [postId, user?.id]);
 
   const fetchLikeStatus = async () => {
     try {
-      const response = await api.get(`/likes/${postId}`);
-      setCount(response.data.count);
-      setLiked(response.data.userLiked);
+      // Get total count
+      const { count: totalCount, error: countError } = await supabase
+        .from('likes')
+        .select('id', { count: 'exact', head: true })
+        .eq('post_id', postId);
+      if (countError) throw countError;
+      setCount(totalCount || 0);
+
+      // Check if current user liked it
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('likes')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (error) throw error;
+        setLiked(!!data);
+      }
     } catch (error) {
       console.error('Error fetching likes:', error);
     }
@@ -66,10 +104,19 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
     setCount(newCount);
 
     try {
-      const response = await api.post(`/likes/${postId}`);
-      // Sync with server response
-      setLiked(response.data.liked);
-      setCount(response.data.count);
+      if (newLiked) {
+        const { error } = await supabase
+          .from('likes')
+          .insert({ post_id: postId, user_id: user.id });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      }
     } catch (error) {
       console.error('Error toggling like:', error);
       // Revert on error

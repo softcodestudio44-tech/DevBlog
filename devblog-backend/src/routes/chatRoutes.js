@@ -14,7 +14,7 @@ const isAdmin = async (req, res, next) => {
       where: { id: decoded.id },
       select: { email: true, role: true },
     });
-    if (user?.role === 'admin' || user?.email === 'softcodestudio44@gmail.com') {
+    if (user?.role === 'admin' || user?.email === 'sofcodestudio44@gmail.com') {
       return next();
     }
     res.status(403).json({ message: 'Admin only' });
@@ -36,7 +36,7 @@ router.delete('/rooms/:roomId', protect, isAdmin, deleteRoom);
 // Admin: Clean up UUID-named rooms (accidentally created with UUIDs as names)
 router.post('/admin/cleanup-uuids', protect, async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin' || req.user.email === 'softcodestudio44@gmail.com';
+    const isAdmin = req.user.role === 'admin' || req.user.email === 'sofcodestudio44@gmail.com';
     if (!isAdmin) {
       return res.status(403).json({ message: 'Admin only' });
     }

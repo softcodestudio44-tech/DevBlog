@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PenLine, LogOut, Home, Users, MessageCircle, Sparkles, 
@@ -11,57 +10,25 @@ import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
-  const { socket } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [messageCount, setMessageCount] = useState(0);
-  const [communityCount, setCommunityCount] = useState(0);
 
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleNewDM = (message) => {
-      if (message.authorId !== user?.id && location.pathname !== '/messages') {
-        setMessageCount(prev => prev + 1);
-      }
-    };
-
-    const handleNewChannelMessage = (message) => {
-      if (message.authorId !== user?.id && location.pathname !== '/community') {
-        setCommunityCount(prev => prev + 1);
-      }
-    };
-
-    socket.on('new-dm', handleNewDM);
-    socket.on('new-message', handleNewChannelMessage);
-
-    return () => {
-      socket.off('new-dm', handleNewDM);
-      socket.off('new-message', handleNewChannelMessage);
-    };
-  }, [socket, location.pathname, user]);
-
-  useEffect(() => {
-    if (location.pathname === '/messages') setMessageCount(0);
-    if (location.pathname === '/community') setCommunityCount(0);
-  }, [location.pathname]);
-
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
     setMobileMenuOpen(false);
   };
 
   const navItems = [
     { to: '/', icon: Home, label: 'Feed' },
-    { to: '/community', icon: Users, label: 'Community', badge: communityCount },
-    { to: '/messages', icon: MessageCircle, label: 'Messages', badge: messageCount },
+    { to: '/community', icon: Users, label: 'Community' },
+    { to: '/messages', icon: MessageCircle, label: 'Messages' },
     { to: '/betty-ai', icon: Sparkles, label: 'Betty AI' },
   ];
 
   const isActive = (path) => location.pathname === path;
-  const isAdmin = user?.email === 'softcodestudio44@gmail.com' || user?.role === 'admin';
+  const isAdmin = user?.email === 'sofcodestudio44@gmail.com' || user?.role === 'admin';
 
   return (
     <>
@@ -106,11 +73,6 @@ const Navbar = () => {
               >
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
-                {item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
-                    {item.badge > 9 ? '9+' : item.badge}
-                  </span>
-                )}
               </Link>
             ))}
             {isAuthenticated && (
@@ -224,11 +186,6 @@ const Navbar = () => {
                   >
                     <item.icon className="w-5 h-5" />
                     <span className="text-sm font-medium">{item.label}</span>
-                    {item.badge > 0 && (
-                      <span className="ml-auto w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
-                        {item.badge > 9 ? '9+' : item.badge}
-                      </span>
-                    )}
                   </Link>
                 ))}
                 {isAuthenticated && (

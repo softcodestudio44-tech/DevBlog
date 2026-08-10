@@ -13,7 +13,7 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -33,20 +33,13 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Registration failed');
+      const { data, error } = await signUp(email, password, name);
+      if (error) throw new Error(error);
+      if (data?.session) {
+        navigate('/');
+      } else {
+        setError('Account created! Check your inbox to confirm your email, then sign in.');
       }
-
-      login(data.token, data.user);
-      navigate('/');
     } catch (err) {
       setError(err.message);
     } finally {

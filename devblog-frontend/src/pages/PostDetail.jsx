@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Clock, Tag, Heart, MessageCircle, Share2, Trash2, Edit3 } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import CommentSection from '../components/CommentSection';
@@ -15,7 +14,6 @@ const PostDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { socket } = useSocket();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
@@ -28,52 +26,29 @@ const PostDetail = () => {
     fetchPost();
   }, [id]);
 
-  // Real-time socket listeners
-  useEffect(() => {
-    if (!socket || !id) return;
-
-    const handlePostUpdated = (data) => {
-      if (data.post.id === id) {
-        setPost((prev) => ({ ...prev, ...data.post }));
-      }
-    };
-
-    const handlePostLiked = (data) => {
-      if (data.postId === id && post) {
-        setPost((prev) => ({
-          ...prev,
-          likeCount: data.action === 'like'
-            ? (prev.likeCount || 0) + 1
-            : Math.max(0, (prev.likeCount || 0) - 1),
-        }));
-      }
-    };
-
-    const handleNewComment = (data) => {
-      if (data.postId === id && post) {
-        setPost((prev) => ({
-          ...prev,
-          commentCount: (prev.commentCount || 0) + 1,
-        }));
-      }
-    };
-
-    socket.on('post-updated', handlePostUpdated);
-    socket.on('post-liked', handlePostLiked);
-    socket.on('new-comment', handleNewComment);
-
-    return () => {
-      socket.off('post-updated', handlePostUpdated);
-      socket.off('post-liked', handlePostLiked);
-      socket.off('new-comment', handleNewComment);
-    };
-  }, [socket, id, post]);
-
   const fetchPost = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/posts/${id}`);
-      setPost(response.data);
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          author:profiles(id, name, avatar, email),
+          likes:likes(count),
+          comments:comments(count)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      
+      setPost({
+        ...data,
+        likeCount: data.likes?.[0]?.count || 0,
+        commentCount: data.comments?.[0]?.count || 0,
+        likes: undefined,
+        comments: undefined,
+      });
     } catch (error) {
       console.error('Error fetching post:', error);
     } finally {
@@ -85,7 +60,11 @@ const PostDetail = () => {
     if (!window.confirm('Delete this post?')) return;
     setDeleting(true);
     try {
-      await api.delete(`/posts/${id}`);
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
       navigate('/');
     } catch (error) {
       console.error('Delete error:', error);
@@ -126,8 +105,8 @@ const PostDetail = () => {
     );
   }
 
-  const isAuthor = user && user.id === post.authorId;
-  const isAdmin = user && (user.role === 'admin' || user.email === 'softcodestudio44@gmail.com');
+  const isAuthor = user && user.id === post.author_id;
+  const isAdmin = user && (user.role === 'admin' || user.email === 'sofcodestudio44@gmail.com');
   const canDelete = isAuthor || isAdmin;
 
   return (
@@ -151,7 +130,7 @@ const PostDetail = () => {
               {/* Author info */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <Link to={`/user/${post.authorId}`}>
+                  <Link to={`/user/${post.author_id}`}>
                     {post.author?.avatar ? (
                       <img
                         src={post.author.avatar}
@@ -165,12 +144,12 @@ const PostDetail = () => {
                     )}
                   </Link>
                   <div>
-                    <Link to={`/user/${post.authorId}`} className="text-sm font-medium text-white hover:text-primary-300 transition-colors">
+                    <Link to={`/user/${post.author_id}`} className="text-sm font-medium text-white hover:text-primary-300 transition-colors">
                       {post.author?.name || 'Unknown'}
                     </Link>
                     <div className="flex items-center gap-1 text-xs text-white/60">
                       <Clock className="w-3 h-3" />
-                      {formatDate(post.createdAt)}
+                      {formatDate(post.created_at)}
                     </div>
                   </div>
                 </div>
@@ -251,7 +230,7 @@ const PostDetail = () => {
             </GlassCard>
 
             {/* Comments */}
-            <CommentSection postId={post.id} postAuthorId={post.authorId} />
+            <CommentSection postId={post.id} postAuthorId={post.author_id} />
           </motion.div>
         </div>
       </div>
