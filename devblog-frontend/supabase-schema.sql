@@ -172,24 +172,54 @@ CREATE TRIGGER set_updated_at_notifications
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- =============================================
--- AUTO-CREATE PROFILE ON SIGNUP
+-- AUTO-CREATE PROFILE ON SIGNUP (admin role for admin email)
 -- =============================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, name)
+  INSERT INTO public.profiles (id, email, name, role)
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    CASE WHEN NEW.email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =============================================
+-- NOTIFY RPC (create notifications from clients, bypasses RLS)
+-- =============================================
+CREATE OR REPLACE FUNCTION public.notify(
+  p_user_id uuid,
+  p_type text,
+  p_message text,
+  p_source_id text DEFAULT NULL,
+  p_source_type text DEFAULT NULL,
+  p_actor_id uuid DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_actor_id IS NOT NULL AND p_actor_id = p_user_id THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO public.notifications (user_id, type, message, source_id, source_type, actor_id)
+  VALUES (p_user_id, p_type, p_message, p_source_id, p_source_type, p_actor_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.notify(uuid, text, text, text, text, uuid)
+  TO anon, authenticated, service_role;
 
 -- =============================================
 -- ROW LEVEL SECURITY POLICIES
@@ -219,10 +249,16 @@ CREATE POLICY "Authenticated users can create posts"
   ON public.posts FOR INSERT WITH CHECK (auth.uid() = author_id);
 
 CREATE POLICY "Authors can update own posts"
-  ON public.posts FOR UPDATE USING (auth.uid() = author_id);
+  ON public.posts FOR UPDATE USING (
+    auth.uid() = author_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
 
 CREATE POLICY "Authors can delete own posts"
-  ON public.posts FOR DELETE USING (auth.uid() = author_id);
+  ON public.posts FOR DELETE USING (
+    auth.uid() = author_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
 
 -- Comments: anyone can read, authenticated can create, author can delete
 CREATE POLICY "Comments are viewable by everyone"
@@ -232,7 +268,11 @@ CREATE POLICY "Authenticated users can create comments"
   ON public.comments FOR INSERT WITH CHECK (auth.uid() = author_id);
 
 CREATE POLICY "Authors can delete own comments"
-  ON public.comments FOR DELETE USING (auth.uid() = author_id);
+  ON public.comments FOR DELETE USING (
+    auth.uid() = author_id
+    OR EXISTS (SELECT 1 FROM public.posts WHERE id = post_id AND author_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
 
 -- Likes: anyone can read, authenticated can create/delete
 CREATE POLICY "Likes are viewable by everyone"
@@ -261,6 +301,11 @@ CREATE POLICY "Channels are viewable by everyone"
 CREATE POLICY "Authenticated users can create channels"
   ON public.channels FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
+CREATE POLICY "Admins can delete channels"
+  ON public.channels FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
 -- Messages: anyone can read, authenticated can create, author can delete
 CREATE POLICY "Messages are viewable by everyone"
   ON public.messages FOR SELECT USING (true);
@@ -269,7 +314,10 @@ CREATE POLICY "Authenticated users can create messages"
   ON public.messages FOR INSERT WITH CHECK (auth.uid() = author_id);
 
 CREATE POLICY "Authors can delete own messages"
-  ON public.messages FOR DELETE USING (auth.uid() = author_id);
+  ON public.messages FOR DELETE USING (
+    auth.uid() = author_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
 
 -- Direct messages: only participants can read
 CREATE POLICY "Users can read their own DMs"
@@ -281,7 +329,10 @@ CREATE POLICY "Users can send DMs"
   ON public.direct_messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
 CREATE POLICY "Users can delete own DMs"
-  ON public.direct_messages FOR DELETE USING (auth.uid() = sender_id);
+  ON public.direct_messages FOR DELETE USING (
+    auth.uid() = sender_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
 
 -- Notifications: only recipient can read/update
 CREATE POLICY "Users can read own notifications"

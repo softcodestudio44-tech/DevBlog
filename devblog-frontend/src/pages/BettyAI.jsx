@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Code, FileText, Sparkles, Loader2, Copy, Check, Mic, Trash2 } from 'lucide-react';
-import api from '../api/axios';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -82,26 +82,23 @@ const BettyAI = () => {
         .slice(-20)
         .map(m => ({ from: m.from, text: m.text }));
 
-      let endpoint = '/ai/chat';
-      let body = { message: input, context: mode, history: conversationHistory };
+      let payload = { mode, message: input, context: mode, history: conversationHistory };
 
       if (mode === 'explain') {
-        endpoint = '/ai/explain';
-        body = { code: input, language: 'javascript', history: conversationHistory };
+        payload = { mode, code: input, language: 'javascript', history: conversationHistory };
       } else if (mode === 'summarize') {
-        endpoint = '/ai/summarize';
-        body = { content: input };
+        payload = { mode, content: input };
       } else if (mode === 'write') {
-        endpoint = '/ai/write';
-        body = { topic: input, type: 'blog post', history: conversationHistory };
+        payload = { mode, topic: input, type: 'blog post', history: conversationHistory };
       }
 
-      const response = await api.post(endpoint, body);
+      const { data, error } = await supabase.functions.invoke('betty-ai', { body: payload });
+      if (error) throw error;
 
       const bettyResponse = {
         id: (Date.now() + 1).toString(),
         from: 'betty',
-        text: response.data.response || response.data.explanation || response.data.summary || response.data.suggestions || "I'm not sure how to respond to that. Try asking something else!",
+        text: data.response || data.explanation || data.summary || data.suggestions || "I'm not sure how to respond to that. Try asking something else!",
         timestamp: new Date(),
       };
 

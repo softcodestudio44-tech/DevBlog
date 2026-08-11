@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, CornerDownRight, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sendNotification } from '../lib/notify';
 
 const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 }) => {
   const { user, isAuthenticated } = useAuth();
@@ -37,6 +38,16 @@ const CommentItem = ({ comment, postId, postAuthorId, onCommentAdded, depth = 0 
       setReplyContent('');
       setReplying(false);
       onCommentAdded();
+      if (comment.author_id !== user.id) {
+        await sendNotification({
+          userId: comment.author_id,
+          type: 'comment',
+          message: `${user.name || 'Someone'} replied to your comment`,
+          sourceId: postId,
+          sourceType: 'post',
+          actorId: user.id,
+        });
+      }
     } catch (error) {
       console.error('Error adding reply:', error);
     }
@@ -313,6 +324,16 @@ const CommentSection = ({ postId, postAuthorId }) => {
         setComments((prev) =>
           prev.map((c) => (c.id === tempId ? { ...data, replies: [] } : c))
         );
+      }
+      if (postAuthorId && postAuthorId !== user.id) {
+        await sendNotification({
+          userId: postAuthorId,
+          type: 'comment',
+          message: `${user.name || 'Someone'} commented on your post`,
+          sourceId: postId,
+          sourceType: 'post',
+          actorId: user.id,
+        });
       }
     } catch (error) {
       setComments((prev) => prev.filter((c) => c.id !== tempId));

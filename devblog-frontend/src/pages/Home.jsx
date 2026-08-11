@@ -541,7 +541,7 @@ const Home = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         <div onClick={(e) => e.stopPropagation()}>
-                          <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
+                          <LikeButton postId={post.id} authorId={post.author_id} initialCount={post.likeCount || 0} />
                         </div>
                         <Link
                           to={`/post/${post.id}`}

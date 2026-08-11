@@ -5,6 +5,7 @@ import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twit
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import GlassCard from '../components/GlassCard';
+import { sendNotification } from '../lib/notify';
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -138,6 +139,16 @@ const UserProfile = () => {
           .from('follows')
           .insert({ follower_id: currentUser.id, following_id: id });
         if (error) throw error;
+        if (id !== currentUser.id) {
+          await sendNotification({
+            userId: id,
+            type: 'follow',
+            message: `${currentUser.name || 'Someone'} started following you`,
+            sourceId: id,
+            sourceType: 'user',
+            actorId: currentUser.id,
+          });
+        }
         setProfile(prev => ({
           ...prev,
           isFollowing: true,

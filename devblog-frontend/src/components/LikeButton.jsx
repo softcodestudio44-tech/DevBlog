@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sendNotification } from '../lib/notify';
 
-const LikeButton = ({ postId, initialCount = 0 }) => {
+const LikeButton = ({ postId, authorId, initialCount = 0 }) => {
   const { user, isAuthenticated } = useAuth();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
@@ -109,6 +110,16 @@ const LikeButton = ({ postId, initialCount = 0 }) => {
           .from('likes')
           .insert({ post_id: postId, user_id: user.id });
         if (error) throw error;
+        if (authorId && authorId !== user.id) {
+          await sendNotification({
+            userId: authorId,
+            type: 'like',
+            message: `${user.name || 'Someone'} liked your post`,
+            sourceId: postId,
+            sourceType: 'post',
+            actorId: user.id,
+          });
+        }
       } else {
         const { error } = await supabase
           .from('likes')

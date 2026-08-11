@@ -217,7 +217,7 @@ const PostDetail = () => {
 
               {/* Actions */}
               <div className="flex items-center gap-4 pt-6 border-t border-white/10">
-                <LikeButton postId={post.id} initialCount={post.likeCount || 0} />
+                <LikeButton postId={post.id} authorId={post.author_id} initialCount={post.likeCount || 0} />
                 <button className="flex items-center gap-2 text-white hover:text-primary-300 transition-colors">
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-sm">{post.commentCount || 0}</span>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sendNotification } from '../lib/notify';
 
 export const useDirectMessages = (otherUserId) => {
   const { user } = useAuth();
@@ -113,6 +114,16 @@ export const useDirectMessages = (otherUserId) => {
           .single();
 
         if (error) throw error;
+        if (otherUserId !== user.id) {
+          await sendNotification({
+            userId: otherUserId,
+            type: 'message',
+            message: `${user.name || 'Someone'} sent you a message`,
+            sourceId: otherUserId,
+            sourceType: 'user',
+            actorId: user.id,
+          });
+        }
         return data;
       } catch (err) {
         console.error('Error sending DM:', err);
