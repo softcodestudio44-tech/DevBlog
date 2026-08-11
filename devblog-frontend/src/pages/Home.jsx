@@ -1,26 +1,58 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
-  Clock, Tag, ArrowRight, Sparkles, Code2, Terminal, Braces, 
-  Database, Globe, MessageCircle, Search, Cpu, Zap, 
-  Layers, ChevronRight, BookOpen,
-  X, Users
+  Clock, Search, X, MessageCircle, BookOpen, PenLine, Share2, Check, Flame
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import GlassCard from '../components/GlassCard';
 import LikeButton from '../components/LikeButton';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 
+const CATEGORIES = [
+  { name: 'All', tag: 'tag-blue' },
+  { name: 'JavaScript', tag: 'tag-amber' },
+  { name: 'React', tag: 'tag-cyan' },
+  { name: 'Python', tag: 'tag-emerald' },
+  { name: 'AI', tag: 'tag-violet' },
+  { name: 'DevOps', tag: 'tag-fuchsia' },
+  { name: 'Tutorial', tag: 'tag-pink' },
+];
+
+const AVATAR_GRADIENTS = [
+  'from-blue-500 to-violet-500',
+  'from-violet-500 to-fuchsia-500',
+  'from-pink-500 to-rose-500',
+  'from-emerald-500 to-teal-500',
+  'from-amber-500 to-orange-500',
+  'from-cyan-500 to-blue-500',
+  'from-fuchsia-500 to-pink-500',
+  'from-indigo-500 to-purple-500',
+];
+
+const avatarGradient = (id = '') => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+};
+
+const tagColorFor = (tag = '') => {
+  const t = tag.toLowerCase();
+  if (t.includes('ai') || t.includes('ml') || t.includes('data')) return 'tag-violet';
+  if (t.includes('react') || t.includes('js') || t.includes('web') || t.includes('frontend')) return 'tag-cyan';
+  if (t.includes('python') || t.includes('django') || t.includes('flask')) return 'tag-emerald';
+  if (t.includes('devops') || t.includes('docker') || t.includes('kubernetes') || t.includes('cloud')) return 'tag-fuchsia';
+  if (t.includes('tutorial') || t.includes('guide') || t.includes('learn')) return 'tag-pink';
+  if (t.includes('backend') || t.includes('api') || t.includes('node')) return 'tag-amber';
+  return 'tag-blue';
+};
+
 const Home = () => {
   const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  const postsRef = useRef(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchActive, setSearchActive] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     fetchPosts();
@@ -167,481 +199,266 @@ const Home = () => {
     }
   };
 
-  const filteredPosts = posts.filter((post) =>
-    post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.tags?.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredPosts = posts.filter((post) => {
+    const matchesSearch =
+      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.tags?.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesCategory =
+      activeCategory === 'All' ||
+      post.tags?.some((tag) => tag.toLowerCase().includes(activeCategory.toLowerCase()));
+
+    return matchesSearch && matchesCategory;
+  });
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const handleStartWriting = () => {
-    if (isAuthenticated) {
-      navigate('/create');
-    } else {
-      navigate('/register');
+  const handleShare = async (post) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
+      setCopiedId(post.id);
+      setTimeout(() => setCopiedId(null), 1600);
+    } catch (err) {
+      console.error('Share failed:', err);
     }
   };
 
-  const handleExplorePosts = () => {
-    postsRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const floatingIcons = [
-    { Icon: Code2, delay: 0, x: '8%', y: '15%', size: 24 },
-    { Icon: Terminal, delay: 1.5, x: '90%', y: '12%', size: 20 },
-    { Icon: Braces, delay: 3, x: '85%', y: '55%', size: 28 },
-    { Icon: Database, delay: 0.8, x: '5%', y: '65%', size: 22 },
-    { Icon: Globe, delay: 2.2, x: '50%', y: '80%', size: 18 },
-    { Icon: Cpu, delay: 1.2, x: '15%', y: '40%', size: 26 },
-    { Icon: Zap, delay: 2.8, x: '75%', y: '30%', size: 20 },
-    { Icon: Layers, delay: 0.4, x: '60%', y: '70%', size: 22 },
-  ];
+  const isFiltering = searchQuery || activeCategory !== 'All';
 
   return (
-    <div className="min-h-screen pb-12 relative overflow-hidden">
-      {/* ===== HERO SECTION ===== */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-        {/* Enhanced orbital rings */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] md:w-[700px] md:h-[700px] rounded-full border border-primary/15 animate-spin-slow" style={{ animationDuration: '30s' }}>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-primary-400/60 shadow-[0_0_30px_rgba(96,165,250,0.6)]" />
+    <div className="app-column px-4 pb-10">
+      {/* App header */}
+      <header className="pt-5 pb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold brand-gradient-text flex items-center gap-2">
+              <BookOpen className="w-6 h-6 text-violet-400" />
+              Feed
+            </h1>
+            <p className="text-xs text-white/40 mt-0.5">Latest from the community</p>
           </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] md:w-[500px] md:h-[500px] rounded-full border border-primary/20 animate-spin-slow" style={{ animationDuration: '20s', animationDirection: 'reverse' }}>
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 rounded-full bg-primary-400/70 shadow-[0_0_25px_rgba(96,165,250,0.5)]" />
-          </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] md:w-[320px] md:h-[320px] rounded-full border border-primary-400/25 animate-spin-slow" style={{ animationDuration: '15s' }}>
-            <div className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary-400/80 shadow-[0_0_25px_rgba(96,165,250,0.5)]" />
-          </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] rounded-full bg-primary/8 blur-3xl" />
+          {isAuthenticated && (
+            <Link
+              to="/create"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 transition-all shadow-lg shadow-violet-500/20"
+            >
+              <PenLine className="w-4 h-4" />
+              Write
+            </Link>
+          )}
         </div>
 
-        {/* Floating icons */}
-        {floatingIcons.map(({ Icon, delay, x, y, size }, i) => (
-          <motion.div
-            key={i}
-            className="absolute pointer-events-none z-10"
-            style={{ left: x, top: y }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ 
-              opacity: [0.15, 0.35, 0.15],
-              y: [0, -15, 0],
-              rotate: [0, 5, -5, 0],
-            }}
-            transition={{ duration: 5, delay, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <Icon className="text-primary-400/30" style={{ width: size, height: size }} />
-          </motion.div>
-        ))}
-
-        {/* Main content */}
-        <div className="relative z-20 max-w-7xl mx-auto px-4 w-full">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            {/* Left: Text */}
-            <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-center lg:text-left"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary-400 text-sm font-medium mb-6"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Built for Developers</span>
-              </motion.div>
-
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-                Build the{' '}
-                <span className="gradient-text">Future</span>
-                <br />
-                Through Code
-              </h1>
-
-              <p className="text-lg text-white/60 max-w-lg mx-auto lg:mx-0 mb-8 leading-relaxed">
-                A developer-first platform to share knowledge, write tutorials, 
-                and connect with the global coding community.
-              </p>
-
-              <div className="flex flex-wrap justify-center lg:justify-start gap-4">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleStartWriting}
-                  className="btn-neon flex items-center gap-2 px-8 py-4 text-base"
-                >
-                  Start Writing
-                  <ArrowRight className="w-5 h-5" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleExplorePosts}
-                  className="px-8 py-4 rounded-2xl border border-white/10 text-white/70 hover:bg-white/5 hover:text-white transition-all flex items-center gap-2"
-                >
-                  Explore Posts
-                  <ChevronRight className="w-5 h-5" />
-                </motion.button>
-              </div>
-            </motion.div>
-
-            {/* Right: LAPTOP IMAGE */}
-            <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="relative mt-8 lg:mt-0"
-            >
-              <div className="relative max-w-lg mx-auto">
-                {/* Glow behind image */}
-                <div className="absolute -inset-8 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-                {/* Main laptop image */}
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60">
-                  <img 
-                    src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80" 
-                    alt="Developer laptop with glowing code"
-                    className="w-full h-auto object-cover"
-                    onError={(e) => {
-                      e.target.src = "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop";
-                    }}
-                  />
-
-                  {/* Overlay gradient for text readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#030405]/60 via-transparent to-transparent" />
-
-                  {/* Floating code snippet overlay */}
-                  <motion.div 
-                    className="absolute bottom-4 left-4 right-4 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/10"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.2 }}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="flex gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-                      </div>
-                      <span className="text-[10px] text-white/40 ml-2 font-mono">devblog.js</span>
-                    </div>
-                    <div className="font-mono text-[11px] text-primary-400/80 space-y-0.5">
-                      <p>const devBlog = new Platform();</p>
-                      <p>devBlog.connect(developers);</p>
-                      <p className="text-white/40">{'>'} Ready on localhost:3000</p>
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* Floating accent elements */}
-                <motion.div
-                  className="absolute -top-4 -right-4 md:-right-6 w-12 h-12 md:w-14 md:h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center backdrop-blur-sm"
-                  animate={{ y: [0, -10, 0], rotate: [0, 8, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                >
-                  <Sparkles className="w-6 h-6 md:w-7 md:h-7 text-primary-400/70" />
-                </motion.div>
-
-                <motion.div
-                  className="absolute -bottom-3 -left-3 md:-left-6 px-3 py-2 md:px-4 md:py-2 rounded-xl bg-[#0a0f0d]/95 border border-white/10 text-white/50 backdrop-blur-sm"
-                  animate={{ y: [0, 6, 0] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
-                    </div>
-                    <span className="text-[10px] md:text-xs font-medium">2.4k online now</span>
-                  </div>
-                </motion.div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <div className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-2">
-            <motion.div
-              className="w-1.5 h-1.5 rounded-full bg-primary-400/60"
-              animate={{ y: [0, 12, 0], opacity: [1, 0.3, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ===== SEARCH BAR ===== */}
-      <section className="max-w-4xl mx-auto px-4 -mt-4 relative z-30">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="glass-strong rounded-2xl p-2 flex items-center gap-3"
-        >
-          <Search className="w-5 h-5 text-white/30 ml-3" />
+        {/* Search */}
+        <div className="flex items-center gap-2 bg-[#0d0f16] border border-white/[0.06] rounded-xl px-3.5 py-2.5 focus-within:border-violet-400/40 transition-colors">
+          <Search className="w-4 h-4 text-white/30 flex-shrink-0" />
           <input
             type="text"
-            placeholder="Search posts, tutorials, topics..."
-            className="flex-1 bg-transparent text-white placeholder-white/30 outline-none py-3"
+            placeholder="Search posts, topics, tags..."
+            className="flex-1 bg-transparent text-sm text-white placeholder-white/30 outline-none min-w-0"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchActive(true)}
-            onBlur={() => setSearchActive(false)}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="p-2 rounded-lg hover:bg-white/5 text-white/40"
+              className="p-1 rounded-md hover:bg-white/5 text-white/40"
             >
               <X className="w-4 h-4" />
             </button>
           )}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 text-white/30 text-xs">
-            <span>Press</span>
-            <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/50">/</kbd>
-            <span>to search</span>
-          </div>
-        </motion.div>
-      </section>
+        </div>
 
-      {/* ===== POSTS SECTION ===== */}
-      <div ref={postsRef} className="max-w-7xl mx-auto px-4 pt-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="flex items-center justify-between mb-10"
-        >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-primary-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white">Latest Posts</h2>
-            </div>
-            <p className="text-white/40 text-sm">Fresh knowledge from the community</p>
-          </div>
-          <div className="text-white/30 text-sm">
-            {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
-          </div>
-        </motion.div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="glass h-72 loading-shimmer rounded-3xl" />
-            ))}
-          </div>
-        ) : filteredPosts.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="glass rounded-3xl p-16 text-center"
-          >
-            <Code2 className="w-12 h-12 text-primary-400/20 mx-auto mb-4" />
-            <p className="text-white/40 text-lg">No posts found matching your search</p>
+        {/* Trending topics */}
+        <div className="flex items-center gap-2 mt-4 overflow-x-auto no-scrollbar">
+          <Flame className="w-4 h-4 text-orange-400 flex-shrink-0" />
+          {CATEGORIES.map((cat) => (
             <button
-              onClick={() => setSearchQuery('')}
-              className="mt-4 text-primary-400 hover:underline text-sm"
+              key={cat.name}
+              onClick={() => setActiveCategory(cat.name)}
+              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                activeCategory === cat.name
+                  ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-md shadow-violet-500/20'
+                  : `border border-white/[0.08] text-white/50 hover:text-white hover:border-white/20`
+              }`}
             >
-              Clear search
+              {cat.name}
             </button>
-          </motion.div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPosts.map((post, index) => (
-              <motion.div
-                key={post.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-50px' }}
-                transition={{ delay: index * 0.05 }}
+          ))}
+        </div>
+      </header>
+
+      {/* Feed */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="panel p-4 loading-shimmer">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-full bg-white/[0.04]" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-32 rounded bg-white/[0.05]" />
+                  <div className="h-2.5 w-20 rounded bg-white/[0.04]" />
+                </div>
+              </div>
+              <div className="h-4 w-3/4 rounded bg-white/[0.05] mb-2" />
+              <div className="h-3 w-full rounded bg-white/[0.04] mb-1.5" />
+              <div className="h-3 w-5/6 rounded bg-white/[0.04]" />
+            </div>
+          ))}
+        </div>
+      ) : filteredPosts.length === 0 ? (
+        <div className="panel p-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-6 h-6 text-violet-400/60" />
+          </div>
+          {isFiltering ? (
+            <>
+              <p className="text-white/70 text-sm font-medium">No posts found</p>
+              <p className="text-xs text-white/40 mt-1">Try a different search or category.</p>
+              <button
+                onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
+                className="mt-4 px-4 py-2 rounded-xl text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 transition-all"
               >
-                <GlassCard className="h-full hover:border-primary/20 transition-all duration-300 group">
-                  <div className="flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Link to={`/user/${post.author_id}`} className="hover:opacity-80 transition-opacity">
-                        {post.author?.avatar ? (
-                          <img
-                            src={post.author.avatar}
-                            alt={post.author.name}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20/20"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600/30 to-primary-400/30 flex items-center justify-center text-xs font-bold text-white">
-                            {post.author?.name?.[0] || 'U'}
-                          </div>
-                        )}
-                      </Link>
-                      <div className="min-w-0">
+                Reset filters
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-white/70 text-sm font-medium">No posts yet</p>
+              <p className="text-xs text-white/40 mt-1">Be the first to share something.</p>
+              {isAuthenticated && (
+                <Link
+                  to="/create"
+                  className="inline-flex items-center gap-2 mt-5 px-4 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 transition-all"
+                >
+                  <PenLine className="w-4 h-4" />
+                  Write a post
+                </Link>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredPosts.map((post, index) => {
+            const isFeatured = !isFiltering && index === 0;
+            const gradient = avatarGradient(post.author_id);
+            return (
+              <article key={post.id} className={isFeatured ? 'p-[1.5px] rounded-[20px] bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/10' : ''}>
+                <div className={`panel p-4 h-full transition-colors ${isFeatured ? 'rounded-[19px] bg-[#0b0d14]' : 'hover:border-white/[0.12]'}`}>
+                  {/* Author */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <Link to={`/user/${post.author_id}`} className="hover:opacity-80 transition-opacity flex-shrink-0">
+                      {post.author?.avatar ? (
+                        <img
+                          src={post.author.avatar}
+                          alt={post.author.name}
+                          className="w-10 h-10 rounded-full object-cover ring-2 ring-white/10"
+                        />
+                      ) : (
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-sm font-bold text-white ring-2 ring-white/10`}>
+                          {post.author?.name?.[0] || 'U'}
+                        </div>
+                      )}
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
                         <Link
                           to={`/user/${post.author_id}`}
-                          className="text-sm font-medium text-white hover:text-primary-400 transition-colors truncate block"
+                          className="text-sm font-semibold text-white hover:text-violet-300 transition-colors truncate"
                         >
                           {post.author?.name || 'Unknown'}
                         </Link>
-                        <div className="flex items-center gap-1 text-xs text-white/40">
-                          <Clock className="w-3 h-3" />
-                          {formatDate(post.created_at)}
-                        </div>
+                        {isFeatured && (
+                          <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-white bg-gradient-to-r from-blue-600 to-fuchsia-600">
+                            <Flame className="w-3 h-3" />
+                            Featured
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-white/40">
+                        <Clock className="w-3 h-3" />
+                        {formatDate(post.created_at)}
                       </div>
                     </div>
-
-                    <Link to={`/post/${post.id}`} className="flex-grow group/link">
-                      <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 group-hover/link:text-primary-400 transition-colors">
-                        <MarkdownRenderer content={post.title} />
-                      </h3>
-                      <p className="text-sm text-white/50 mb-4 line-clamp-3 leading-relaxed">
-                        {post.content}
-                      </p>
-                    </Link>
-
-                    {post.images && post.images.length > 0 && (
-                      <Link to={`/post/${post.id}`} className="mb-4 block">
-                        <div className="rounded-xl overflow-hidden bg-white/5 border border-white/5">
-                          <img
-                            src={post.images[0]}
-                            alt={post.title}
-                            className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          {post.images.length > 1 && (
-                            <div className="px-3 py-1.5 text-xs text-white/40 bg-black/40">
-                              +{post.images.length - 1} more
-                            </div>
-                          )}
-                        </div>
-                      </Link>
+                    {post.tags?.[0] && (
+                      <span className={`tag ${tagColorFor(post.tags[0])} flex-shrink-0`}>
+                        {post.tags[0]}
+                      </span>
                     )}
+                  </div>
 
-                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
-                      <div className="flex gap-2 flex-wrap">
-                        {post.tags?.slice(0, 2).map((tag) => (
-                          <span
-                            key={tag}
-                            className="tag text-xs flex items-center gap-1"
-                          >
-                            <Tag className="w-3 h-3" />
-                            {tag}
-                          </span>
-                        ))}
+                  {/* Content */}
+                  <Link to={`/post/${post.id}`} className="block group">
+                    <h2 className="text-base font-semibold text-white leading-snug mb-1.5 group-hover:text-violet-300 transition-colors">
+                      <MarkdownRenderer content={post.title} />
+                    </h2>
+                    <p className="text-sm text-white/50 leading-relaxed line-clamp-3">
+                      {post.content}
+                    </p>
+                  </Link>
+
+                  {post.images && post.images.length > 0 && (
+                    <Link to={`/post/${post.id}`} className="mt-3 block">
+                      <div className="rounded-xl overflow-hidden bg-white/5 border border-white/5">
+                        <img
+                          src={post.images[0]}
+                          alt={post.title}
+                          className="w-full h-44 object-cover"
+                          loading="lazy"
+                        />
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <LikeButton postId={post.id} authorId={post.author_id} initialCount={post.likeCount || 0} />
-                        </div>
-                        <Link
-                          to={`/post/${post.id}`}
-                          className="flex items-center gap-1 text-white/40 hover:text-primary-400 transition-colors"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          <span className="text-xs">{post.commentCount || 0}</span>
-                        </Link>
-                      </div>
+                    </Link>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.06]">
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <LikeButton postId={post.id} authorId={post.author_id} initialCount={post.likeCount || 0} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        to={`/post/${post.id}`}
+                        className="flex items-center gap-1.5 text-white/40 hover:text-violet-300 transition-colors text-sm"
+                      >
+                        <MessageCircle className="w-[18px] h-[18px]" />
+                        <span>{post.commentCount || 0}</span>
+                      </Link>
+                      <button
+                        onClick={() => handleShare(post)}
+                        className="flex items-center gap-1.5 text-white/40 hover:text-violet-300 transition-colors text-sm"
+                        title="Copy link"
+                      >
+                        {copiedId === post.id ? (
+                          <Check className="w-[18px] h-[18px] text-emerald-400" />
+                        ) : (
+                          <Share2 className="w-[18px] h-[18px]" />
+                        )}
+                      </button>
+                      <Link
+                        to={`/post/${post.id}`}
+                        className="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors"
+                      >
+                        Read
+                      </Link>
                     </div>
                   </div>
-                </GlassCard>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ===== FEATURES SECTION ===== */}
-      <section className="max-w-7xl mx-auto px-4 pt-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-12"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary-400 text-sm font-medium mb-4">
-            <Zap className="w-4 h-4" />
-            <span>Why DevBlog?</span>
-          </div>
-          <h2 className="text-3xl font-bold text-white mb-3">Everything a Developer Needs</h2>
-          <p className="text-white/40 max-w-lg mx-auto">Built from the ground up for the modern developer workflow</p>
-        </motion.div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {[
-            {
-              icon: Terminal,
-              title: 'Code-First Writing',
-              desc: 'Markdown support with syntax highlighting for every language. Write tutorials that actually look good.',
-            },
-            {
-              icon: Users,
-              title: 'Live Community',
-              desc: 'Real-time chat, DMs, and community channels. Connect with developers worldwide instantly.',
-            },
-            {
-              icon: Sparkles,
-              title: 'AI Assistant',
-              desc: 'Betty AI helps you write, review code, and answer questions 24/7 inside the platform.',
-            },
-          ].map((feature, i) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <div className="glass p-8 rounded-3xl h-full hover:border-primary/20 transition-all duration-300 group">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:bg-primary/15 transition-colors">
-                  <feature.icon className="w-7 h-7 text-primary-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3">{feature.title}</h3>
-                <p className="text-white/50 leading-relaxed">{feature.desc}</p>
-              </div>
-            </motion.div>
-          ))}
+              </article>
+            );
+          })}
         </div>
-      </section>
-
-      {/* ===== CTA SECTION ===== */}
-      <section className="max-w-4xl mx-auto px-4 pt-24 pb-12">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="glass-strong rounded-3xl p-10 md:p-16 text-center relative overflow-hidden"
-        >
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Ready to share your knowledge?
-            </h2>
-            <p className="text-white/50 max-w-lg mx-auto mb-8">
-              Join thousands of developers who use DevBlog to document, teach, and grow together.
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleStartWriting}
-              className="btn-neon px-10 py-4 text-base inline-flex items-center gap-2"
-            >
-              {isAuthenticated ? 'Write Your First Post' : 'Join DevBlog'}
-              <ArrowRight className="w-5 h-5" />
-            </motion.button>
-          </div>
-        </motion.div>
-      </section>
+      )}
     </div>
   );
 };

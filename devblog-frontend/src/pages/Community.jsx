@@ -158,14 +158,14 @@ const Community = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#030405]">
+      <div className="flex items-center justify-center h-[calc(100dvh-64px-60px)] lg:h-[calc(100dvh-64px)]">
         <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-blue-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[#030405] overflow-hidden relative">
+    <div className="flex h-[calc(100dvh-64px-60px)] lg:h-[calc(100dvh-64px)] overflow-hidden relative">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-primary/[0.03] blur-3xl animate-pulse" style={{animationDuration: '8s'}} />

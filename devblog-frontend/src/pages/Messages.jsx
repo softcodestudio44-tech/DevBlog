@@ -9,22 +9,14 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { useDirectMessages } from '../hooks/useDirectMessages';
 
-const DM_ACTIVE_USER_KEY = 'devblog-dm-active-user';
-
 const Messages = () => {
   const { user, isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
   const [dmHistory, setDmHistory] = useState([]);
-  const [activeDMUser, setActiveDMUser] = useState(() => {
-    try {
-      const cached = localStorage.getItem(DM_ACTIVE_USER_KEY);
-      return cached ? JSON.parse(cached) : null;
-    } catch (err) {
-      return null;
-    }
-  });
+  const [activeDMUser, setActiveDMUser] = useState(null);
+  const [pendingDMUserId, setPendingDMUserId] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -45,39 +37,126 @@ const Messages = () => {
     loading: dmLoading 
   } = useDirectMessages(activeDMUser?.id);
 
-  // Fetch all profiles as potential DM partners
+  // Fetch only connected people (mutual followers or prior DM partners)
   useEffect(() => {
     fetchDMHistory();
-  }, []);
+  }, [isAuthenticated, user?.id]);
 
-  const fetchDMHistory = async () => {
-    if (!isAuthenticated) {
+  const fetchDMHistory = useCallback(async () => {
+    if (!isAuthenticated || !user?.id) {
+      setDmHistory([]);
       setLoading(false);
       return;
     }
     try {
+      const myId = user.id;
+
+      // Users who follow me
+      const { data: followers, error: followersError } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('following_id', myId);
+      if (followersError) throw followersError;
+
+      // Users I follow
+      const { data: following, error: followingError } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', myId);
+      if (followingError) throw followingError;
+
+      // People I've exchanged direct messages with
+      const { data: dmPartners, error: dmError } = await supabase
+        .from('direct_messages')
+        .select('sender_id, recipient_id')
+        .or(`sender_id.eq.${myId},recipient_id.eq.${myId}`);
+      if (dmError) throw dmError;
+
+      const followerIds = new Set((followers || []).map(f => f.follower_id));
+      const followingIds = new Set((following || []).map(f => f.following_id));
+      const mutualIds = [...followingIds].filter(id => followerIds.has(id));
+
+      const dmPartnerIds = new Set();
+      (dmPartners || []).forEach(m => {
+        if (m.sender_id === myId) dmPartnerIds.add(m.recipient_id);
+        else if (m.recipient_id === myId) dmPartnerIds.add(m.sender_id);
+      });
+
+      const partnerIds = [...new Set([...mutualIds, ...dmPartnerIds])].filter(id => id !== myId);
+
+      if (partnerIds.length === 0) {
+        setDmHistory([]);
+        setActiveDMUser(null);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('id, name, avatar, email')
+        .in('id', partnerIds)
         .order('name', { ascending: true });
 
       if (error) throw error;
-      
-      const partnerIds = (data || []).filter(u => u.id !== user?.id);
-      setDmHistory(partnerIds);
+
+      setDmHistory(data || []);
+
+      // Reconcile the active conversation against the connected list:
+      // never show a user who isn't a mutual friend/DM partner.
+      setActiveDMUser((current) => {
+        const list = data || [];
+        if (current && list.some(u => u.id === current.id)) return current;
+        return list[0] || null;
+      });
+
       setLoading(false);
     } catch (err) { 
-      console.error('Error fetching profiles:', err);
+      console.error('Error fetching DM history:', err);
+      setDmHistory([]);
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, user?.id]);
 
-  // Handle URL param for starting DM
+  // Keep the partner list fresh in real-time (new mutual follow or first DM)
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+
+    const channel = supabase
+      .channel(`dm-partners:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'follows',
+          filter: `or(follower_id=eq.${user.id},following_id=eq.${user.id})`,
+        },
+        () => fetchDMHistory()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'direct_messages',
+          filter: `or(sender_id=eq.${user.id},recipient_id=eq.${user.id})`,
+        },
+        () => fetchDMHistory()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, user?.id, fetchDMHistory]);
+
+  // Handle URL param for starting DM (only opened once the connection list is loaded,
+  // and only if the target is actually a connected friend/DM partner)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     const dmUserId = searchParams.get('user') || searchParams.get('dm');
     if (!dmUserId) return;
-    openDMUserById(dmUserId);
+    setPendingDMUserId(dmUserId);
     const params = new URLSearchParams(searchParams);
     params.delete('user');
     params.delete('dm');
@@ -85,31 +164,32 @@ const Messages = () => {
     navigate(`${window.location.pathname}${query ? `?${query}` : ''}`, { replace: true });
   }, [searchParams, isAuthenticated, user, navigate]);
 
+  // Resolve the pending DM target against the connected people list
+  useEffect(() => {
+    if (!pendingDMUserId || loading) return;
+    if (dmHistory.length === 0) {
+      setPendingDMUserId(null);
+      return;
+    }
+    const target = dmHistory.find(u => u.id === pendingDMUserId);
+    if (target) {
+      setActiveDMUser(target);
+      setReplyTo(null);
+      setShowSidebar(false);
+      setTimeout(() => markAsRead(), 300);
+    }
+    setPendingDMUserId(null);
+  }, [pendingDMUserId, dmHistory, loading]);
+
   const startDM = async (targetUser) => {
     if (!targetUser || targetUser.id === user?.id) return;
     setActiveDMUser(targetUser);
     setReplyTo(null);
     setShowSidebar(false);
-    localStorage.setItem(DM_ACTIVE_USER_KEY, JSON.stringify(targetUser));
     
     // Mark messages as read when opening a conversation
     setTimeout(() => markAsRead(), 300);
   };
-
-  const openDMUserById = useCallback(async (targetUserId) => {
-    if (!targetUserId || !user?.id || targetUserId === user.id) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, avatar, email, bio')
-        .eq('id', targetUserId)
-        .single();
-      if (error) throw error;
-      if (data) startDM(data);
-    } catch (err) {
-      console.error('Failed to open DM from query params:', err);
-    }
-  }, [user?.id]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -158,14 +238,14 @@ const Messages = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-[#030405]">
+      <div className="flex items-center justify-center h-[calc(100dvh-64px-60px)] lg:h-[calc(100dvh-64px)]">
         <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-blue-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[#030405] overflow-hidden relative">
+    <div className="flex h-[calc(100dvh-64px-60px)] lg:h-[calc(100dvh-64px)] overflow-hidden relative">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-primary/[0.03] blur-3xl animate-pulse" style={{animationDuration: '8s'}} />
@@ -196,7 +276,7 @@ const Messages = () => {
               </div>
               <div>
                 <h2 className="font-bold text-white text-sm">People</h2>
-                <p className="text-xs text-primary-300/70">{dmHistory.length} members</p>
+                <p className="text-xs text-primary-300/70">{dmHistory.length} connected</p>
               </div>
             </div>
             <div className="relative">
@@ -212,46 +292,57 @@ const Messages = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <div className="p-3 space-y-1">
-              <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">ALL MEMBERS</p>
-              {dmHistory.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
-                const isActive = activeDMUser?.id === u.id;
-                return (
-                  <button
-                    key={u.id}
-                    onClick={() => startDM(u)}
-                    className={`w-full text-left p-4 rounded-3xl transition-all ${
-                      isActive ? 'bg-primary/15 border border-primary/20 shadow-sm shadow-blue-500/10' : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-11 h-11 rounded-full overflow-hidden">
-                          {u.avatar ? (
-                            <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-800 flex items-center justify-center text-sm font-bold text-white">
-                              {u.name?.[0]}
-                            </div>
-                          )}
+            {dmHistory.length === 0 ? (
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <MessageCircle className="w-8 h-8 text-primary-400/40" />
+                </div>
+                <p className="text-sm font-medium text-white/70">No conversations yet</p>
+                <p className="text-xs text-white/40 mt-1">Follow someone or send a message to start chatting</p>
+                <Link to="/community" className="btn-neon inline-flex items-center justify-center gap-2 px-4 py-2 mt-5 text-sm w-full">
+                  <Users className="w-4 h-4" />
+                  Explore Community
+                </Link>
+              </div>
+            ) : (
+              <div className="p-3 space-y-1">
+                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-3 mb-2">FRIENDS &amp; MESSAGES</p>
+                {dmHistory.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
+                  const isActive = activeDMUser?.id === u.id;
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => startDM(u)}
+                      className={`w-full text-left p-4 rounded-3xl transition-all ${
+                        isActive ? 'bg-primary/15 border border-primary/20 shadow-sm shadow-blue-500/10' : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-11 h-11 rounded-full overflow-hidden">
+                            {u.avatar ? (
+                              <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-primary-700 to-primary-800 flex items-center justify-center text-sm font-bold text-white">
+                                {u.name?.[0]}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
+                          <span className="text-[12px] text-white/50 truncate block">
+                            {u.email}
+                          </span>
                         </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
-                        <span className="text-[12px] text-white/50 truncate block">
-                          {u.email}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    </button>
+                  );
+                })}
 
-            {dmHistory.length === 0 && (
-              <div className="glass p-8 text-center">
-                <MessageCircle className="w-10 h-10 text-white/20 mx-auto mb-3" />
-                <p className="text-sm text-white/40">No members to message yet.</p>
+                {dmHistory.filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                  <div className="p-4 text-center text-xs text-white/40">No matching people</div>
+                )}
               </div>
             )}
           </div>
@@ -322,6 +413,20 @@ const Messages = () => {
               </div>
             )}
             
+            {!activeDMUser && (
+              <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+                <div className="w-20 h-20 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center mb-4">
+                  <MessageCircle className="w-10 h-10 text-white/20" />
+                </div>
+                <p className="text-sm font-medium text-white/60">Select a conversation</p>
+                <p className="text-xs text-white/30 mt-1">
+                  {dmHistory.length === 0
+                    ? 'No connections yet. Follow someone to start chatting.'
+                    : 'Choose someone from your connections to start chatting'}
+                </p>
+              </div>
+            )}
+
             {dmMessages.length === 0 && activeDMUser && !dmLoading && (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <div className="w-20 h-20 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center mb-4">

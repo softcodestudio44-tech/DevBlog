@@ -2,8 +2,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-const GENERAL_MODEL = Deno.env.get('GROQ_MODEL') || 'openai/gpt-oss-120b';
-const CODE_MODEL = Deno.env.get('GROQ_CODE_MODEL') || 'openai/gpt-oss-120b';
+const GENERAL_MODEL = Deno.env.get('GROQ_MODEL') || 'llama-3.1-70b-versatile';
+const CODE_MODEL = Deno.env.get('GROQ_CODE_MODEL') || 'llama-3.1-70b-versatile';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,16 +11,38 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const BETTY_SYSTEM = `You are Betty AI, the built-in assistant on DevBlog - a developer blogging platform with a shared feed, community chat, direct messages, and notifications.
+const BETTY_SYSTEM = `You are Betty AI, a senior full-stack developer and technical mentor on DevBlog. You help developers with:
+- Writing and debugging code
+- Explaining technical concepts
+- Reviewing code for best practices
+- Suggesting improvements and optimizations
+- Recommending tools and libraries
+- Career advice for developers
 
-Personality and behavior:
-- Be friendly, concise, and practical. Developers are your primary audience.
-- When asked to write or improve a blog post, use a clear structure: intro, key points, code examples, and a conclusion.
-- Always use markdown with fenced code blocks for code, and include the language tag (e.g. javascript).
-- Prefer modern, correct, idiomatic solutions. If something is deprecated, say so.
-- If a request is ambiguous, ask one clarifying question instead of guessing.
-- Never invent API names, packages, or facts. If you are unsure, say so honestly.
-- Keep responses scannable: short paragraphs, bullet points, and code blocks.`;
+Always provide practical, actionable answers with code examples when relevant. Be friendly but professional. If you don't know something, say so honestly.
+
+Style rules:
+- Use markdown with fenced code blocks that include the language tag (e.g. \`\`\`javascript).
+- Keep responses scannable: short paragraphs, bullet points, and code.
+- Never invent API names, packages, or facts. Flag deprecated approaches.
+- If a request is ambiguous, ask one clarifying question instead of guessing.`;
+
+const CODE_REVIEW_SYSTEM = `You are Betty AI, a senior code reviewer. Review code for:
+- Correctness and hidden bugs
+- Security issues (injection, secrets, unsafe eval, etc.)
+- Performance problems
+- Readability, naming, and structure
+- Best practices and modern idiomatic alternatives
+
+Respond with: (1) a one-line verdict, (2) numbered findings with severity (Critical/Warning/Nit), (3) concrete fixes with code examples, (4) a "Good stuff" line for what works. Be direct and constructive. Use markdown with fenced code blocks.`;
+
+const DEBUG_SYSTEM = `You are Betty AI, a debugging expert. Given an error message and/or code:
+- Diagnose the most likely root cause
+- Explain why it happens in simple terms
+- Give a step-by-step fix with corrected code
+- List quick sanity checks (versions, env vars, common pitfalls)
+
+Use markdown with fenced code blocks. If the error is ambiguous, list the top 2-3 likely causes with how to confirm each.`;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -115,6 +137,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const mode = body?.mode || 'chat';
 
+    // Optional memory: tech stack detected from the user's conversations
+    const techStack = Array.isArray(body?.techStack) ? body.techStack : [];
+
     let result: Record<string, string>;
 
     if (mode === 'explain') {
@@ -123,7 +148,7 @@ Deno.serve(async (req) => {
 
       const text = await callGroq({
         model: CODE_MODEL,
-        system: `You are Betty AI, a code explainer for developers. Explain code in simple terms, breaking it down section by section. Be beginner-friendly but accurate. Point out potential bugs or improvements. Use markdown and keep line references when helpful.`,
+        system: `You are Betty AI, a code explainer for developers. Explain code in simple terms, breaking it down section by section. Be beginner-friendly but accurate. Point out potential bugs or improvements. Use markdown and keep line references when helpful.${techStack.length ? `\n\nThe user works with: ${techStack.join(', ')}.` : ''}`,
         messages: [
           ...formatHistory(body.history),
           { role: 'user', content: `Explain this ${language || 'code'}:\n\n\`\`\`\n${code}\n\`\`\`` },
@@ -150,7 +175,7 @@ Deno.serve(async (req) => {
 
       const text = await callGroq({
         model: GENERAL_MODEL,
-        system: `You are Betty AI, a writing assistant for developer blog posts. Help structure, improve, and create content. Return ready-to-paste markdown with clear headings, code examples, and a strong intro and conclusion.`,
+        system: `You are Betty AI, a writing assistant for developer blog posts. Help structure, improve, and create content. Return ready-to-paste markdown with clear headings, code examples, and a strong intro and conclusion.${techStack.length ? `\n\nThe user works with: ${techStack.join(', ')}.` : ''}`,
         messages: [
           ...formatHistory(body.history),
           { role: 'user', content: `Help me write a ${type || 'blog post'} about: ${topic}\n\n${currentText ? `Current draft: ${currentText}` : ''}` },
@@ -159,6 +184,36 @@ Deno.serve(async (req) => {
         maxTokens: 2048,
       });
       result = { suggestions: text || "I couldn't help with that. Please try again!", from: 'Betty AI' };
+    } else if (mode === 'review') {
+      const { code, language } = body;
+      if (!code) return json({ error: 'Code is required' }, 400);
+
+      const text = await callGroq({
+        model: CODE_MODEL,
+        system: CODE_REVIEW_SYSTEM,
+        messages: [
+          ...formatHistory(body.history),
+          { role: 'user', content: `Review this ${language || 'code'}:\n\n\`\`\`\n${code}\n\`\`\`` },
+        ],
+        temperature: 0.3,
+        maxTokens: 2048,
+      });
+      result = { review: text || "I couldn't review that code. Please try again!", from: 'Betty AI' };
+    } else if (mode === 'debug') {
+      const { code, error } = body;
+      if (!code && !error) return json({ error: 'Error message or code is required' }, 400);
+
+      const text = await callGroq({
+        model: CODE_MODEL,
+        system: DEBUG_SYSTEM,
+        messages: [
+          ...formatHistory(body.history),
+          { role: 'user', content: `Help me debug this.\n\nError:\n${error || '(no error message provided)'}\n\nCode:\n\`\`\`\n${code || '(no code provided)'}\n\`\`\`` },
+        ],
+        temperature: 0.3,
+        maxTokens: 2048,
+      });
+      result = { debug: text || "I couldn't help debug that. Please try again!", from: 'Betty AI' };
     } else {
       const { message, context } = body;
       if (!message) return json({ error: 'Message is required' }, 400);
@@ -170,7 +225,9 @@ Deno.serve(async (req) => {
 
       const text = await callGroq({
         model: GENERAL_MODEL,
-        system: BETTY_SYSTEM,
+        system: techStack.length
+          ? `${BETTY_SYSTEM}\n\nThe user's known tech stack: ${techStack.join(', ')}. Use it to personalize recommendations.`
+          : BETTY_SYSTEM,
         messages: [...historyMessages, { role: 'user', content: userContent }],
         temperature: 0.7,
         maxTokens: 2048,
@@ -182,7 +239,7 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     if (error?.status === 429) {
       return json({
-        response: `**Rate limit reached.** Please wait a bit before trying again.\n\nFree tier limits: 30 requests/min, 1,000 requests/day.`,
+        response: `**Rate limit reached.** Please wait a bit before trying again.`,
         from: 'Betty AI',
       }, 429);
     }

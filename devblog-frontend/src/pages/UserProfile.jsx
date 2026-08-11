@@ -23,6 +23,74 @@ const UserProfile = () => {
     fetchProfileData();
   }, [id]);
 
+  // Real-time: follower count + list update instantly when someone follows/unfollows
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`profile-follows:${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'follows',
+          filter: `following_id=eq.${id}`,
+        },
+        async (payload) => {
+          const followerId = payload.new?.follower_id;
+          // Skip own follow action (already handled optimistically)
+          if (!followerId || followerId === currentUser?.id) return;
+          setProfile((prev) =>
+            prev ? { ...prev, followersCount: (prev.followersCount || 0) + 1 } : prev
+          );
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('id, name, avatar, email')
+              .eq('id', followerId)
+              .single();
+            if (data) {
+              setProfile((prev) =>
+                prev && !(prev.followersList || []).some((f) => f.id === data.id)
+                  ? { ...prev, followersList: [data, ...(prev.followersList || [])] }
+                  : prev
+              );
+            }
+          } catch (err) {
+            console.error('Error fetching new follower:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'follows',
+          filter: `following_id=eq.${id}`,
+        },
+        (payload) => {
+          const followerId = payload.old?.follower_id;
+          if (!followerId || followerId === currentUser?.id) return;
+          setProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  followersCount: Math.max(0, (prev.followersCount || 0) - 1),
+                  followersList: (prev.followersList || []).filter((f) => f.id !== followerId),
+                }
+              : prev
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, currentUser?.id]);
+
   const fetchProfileData = async () => {
     try {
       setLoading(true);

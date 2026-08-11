@@ -102,7 +102,7 @@ const CreatePost = () => {
   return (
     <>
       <SEO title="Write Post — DevBlog" description="Create a new blog post" />
-      <div className="min-h-screen pt-24 pb-12 px-4" style={{ background: '#050608' }}>
+      <div className="min-h-screen pt-24 pb-12 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
             <h1 className="text-2xl font-bold text-white">Write Post</h1>
