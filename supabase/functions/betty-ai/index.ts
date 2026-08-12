@@ -2,8 +2,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-const GENERAL_MODEL = Deno.env.get('GROQ_MODEL') || 'llama-3.1-70b-versatile';
-const CODE_MODEL = Deno.env.get('GROQ_CODE_MODEL') || 'llama-3.1-70b-versatile';
+const GENERAL_MODEL = Deno.env.get('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+const CODE_MODEL = Deno.env.get('GROQ_CODE_MODEL') || 'llama-3.3-70b-versatile';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
