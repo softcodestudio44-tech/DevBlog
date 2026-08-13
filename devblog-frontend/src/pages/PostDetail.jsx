@@ -33,7 +33,7 @@ const PostDetail = () => {
         .from('posts')
         .select(`
           *,
-          author:profiles(id, name, avatar, email),
+          author:profiles!posts_author_id_fkey(id, name, avatar, email),
           likes:likes(count),
           comments:comments(count)
         `)
