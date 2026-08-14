@@ -25,11 +25,37 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Create the profile row for a user if it doesn't exist yet (e.g. social login)
+  const ensureProfile = async (authUser) => {
+    if (!authUser) return null;
+
+    const existing = await fetchProfile(authUser.id);
+    if (existing) return existing;
+
+    const metadata = authUser.user_metadata || {};
+    const email = authUser.email || metadata.email || (metadata.user_name || authUser.id) + '@devblog.local';
+    const name = metadata.full_name || metadata.name || metadata.user_name || (authUser.email ? authUser.email.split('@')[0] : 'Developer');
+    const avatar = metadata.avatar_url || metadata.picture || null;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({ id: authUser.id, email, name, avatar }, { onConflict: 'id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error creating profile:', err);
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
+        const profile = await ensureProfile(session.user);
         setUser({ ...session.user, ...profile });
         setProfile(profile);
         setIsAuthenticated(true);
@@ -41,7 +67,7 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
-          const profile = await fetchProfile(session.user.id);
+          const profile = await ensureProfile(session.user);
           setUser({ ...session.user, ...profile });
           setProfile(profile);
           setIsAuthenticated(true);
@@ -50,7 +76,7 @@ export const AuthProvider = ({ children }) => {
           setProfile(null);
           setIsAuthenticated(false);
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          const profile = await fetchProfile(session.user.id);
+          const profile = await ensureProfile(session.user);
           setUser({ ...session.user, ...profile });
           setProfile(profile);
           setIsAuthenticated(true);
@@ -94,7 +120,10 @@ export const AuthProvider = ({ children }) => {
 
   const signInWithOAuth = async (provider) => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({ provider });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
+      });
       if (error) throw error;
       return { data, error: null };
     } catch (err) {

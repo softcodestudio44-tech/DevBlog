@@ -53,6 +53,8 @@ GRANT EXECUTE ON FUNCTION public.notify(uuid, text, text, text, text, uuid)
 
 -- ------------------------------------------------------------
 -- 3) SIGNUP TRIGGER - grant admin role to the admin email
+--    OAuth-safe: pulls name/avatar from metadata, tolerates
+--    NULL email (GitHub), upserts in place.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -60,19 +62,52 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  _email text;
+  _name text;
+  _avatar text;
 BEGIN
-  INSERT INTO public.profiles (id, email, name, role)
+  _email := COALESCE(
+    NULLIF(NEW.email, ''),
+    NULLIF(NEW.raw_user_meta_data->>'email', ''),
+    NULLIF(NEW.raw_user_meta_data->>'user_name', '') || '@devblog.local',
+    NEW.id::text || '@devblog.local'
+  );
+
+  _name := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+    NULLIF(NEW.raw_user_meta_data->>'name', ''),
+    NULLIF(NEW.raw_user_meta_data->>'user_name', ''),
+    split_part(_email, '@', 1)
+  );
+
+  _avatar := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'avatar_url', ''),
+    NULLIF(NEW.raw_user_meta_data->>'picture', '')
+  );
+
+  INSERT INTO public.profiles (id, email, name, avatar, role)
   VALUES (
     NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    CASE WHEN NEW.email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
-  );
+    _email,
+    _name,
+    _avatar,
+    CASE WHEN _email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = EXCLUDED.name,
+    avatar = COALESCE(public.profiles.avatar, EXCLUDED.avatar);
   RETURN NEW;
 END;
 $$;
 
 -- Trigger is already attached (on_auth_user_created), function is replaced in place.
+
+-- Let clients create their own profile as a fallback (used by frontend ensureProfile)
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile"
+  ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- ------------------------------------------------------------
 -- 4) RLS POLICIES - admin / author delete coverage

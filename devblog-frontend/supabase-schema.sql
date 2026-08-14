@@ -173,17 +173,47 @@ CREATE TRIGGER set_updated_at_notifications
 
 -- =============================================
 -- AUTO-CREATE PROFILE ON SIGNUP (admin role for admin email)
+-- OAuth-safe: pulls name/avatar from metadata, tolerates
+-- NULL email (GitHub), upserts in place.
 -- =============================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  _email text;
+  _name text;
+  _avatar text;
 BEGIN
-  INSERT INTO public.profiles (id, email, name, role)
+  _email := COALESCE(
+    NULLIF(NEW.email, ''),
+    NULLIF(NEW.raw_user_meta_data->>'email', ''),
+    NULLIF(NEW.raw_user_meta_data->>'user_name', '') || '@devblog.local',
+    NEW.id::text || '@devblog.local'
+  );
+
+  _name := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+    NULLIF(NEW.raw_user_meta_data->>'name', ''),
+    NULLIF(NEW.raw_user_meta_data->>'user_name', ''),
+    split_part(_email, '@', 1)
+  );
+
+  _avatar := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'avatar_url', ''),
+    NULLIF(NEW.raw_user_meta_data->>'picture', '')
+  );
+
+  INSERT INTO public.profiles (id, email, name, avatar, role)
   VALUES (
     NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    CASE WHEN NEW.email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
-  );
+    _email,
+    _name,
+    _avatar,
+    CASE WHEN _email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = EXCLUDED.name,
+    avatar = COALESCE(public.profiles.avatar, EXCLUDED.avatar);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -234,12 +264,15 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.direct_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- Profiles: anyone can read, user can update own
+-- Profiles: anyone can read, user can update own, user can create own (OAuth fallback)
 CREATE POLICY "Profiles are viewable by everyone"
   ON public.profiles FOR SELECT USING (true);
 
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile"
+  ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Posts: anyone can read, authenticated can create, author can update/delete
 CREATE POLICY "Posts are viewable by everyone"

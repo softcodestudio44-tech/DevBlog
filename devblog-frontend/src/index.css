@@ -18,6 +18,7 @@
   --white: #FFFFFF;
   --body: #CBD5E1;
   --muted: #9CA3AF;
+  --heading: #FFFFFF;
 }
 
 * {
@@ -403,7 +404,7 @@ body {
 
 /* ===== Heading Colors ===== */
 h1, h2, h3, h4, h5, h6 {
-  color: #FFFFFF;
+  color: var(--heading);
 }
 
 /* ===== Body Text ===== */
@@ -887,8 +888,95 @@ html.light main .glass-auth-card {
   border-color: #e2e8f0;
   box-shadow: 0 8px 40px rgba(15, 23, 42, 0.1);
 }
-html.light main .glass-oauth { background: #ffffff; border-color: #e2e8f0; }
+html.light main .glass-oauth { background: #ffffff; border-color: #e2e8f0; color: #0f172a; }
+html.light main .glass-oauth:hover { background: #f8fafc; border-color: #cbd5e1; }
+html.light main .spinner-xs { border-color: rgba(15, 23, 42, 0.2); border-top-color: #0f172a; }
 
 /* Bottom tab bar */
 html.light .tab-bar { background: #ffffff; border-top-color: #e2e8f0; }
 html.light .tab-item { color: rgba(15, 23, 42, 0.5); }
+html.light .tab-item span { color: rgba(15, 23, 42, 0.55); }
+html.light .tab-item.active { color: #7c3aed; }
+html.light .tab-item.active span { color: #7c3aed; }
+
+/* Base palette flip (headings/body/muted text) */
+html.light { --heading: #0f172a; --body: #1e293b; --muted: #475569; }
+
+/* Navbar & dropdowns (outside <main>) */
+html.light nav.bg-\[\#0d0f16\],
+html.light nav.bg-\[\#0b0d14\],
+html.light nav :is(.bg-\[\#0d0f16\], .bg-\[\#0b0d14\]) { background: #ffffff; border-color: #e2e8f0; }
+html.light nav .glass-strong { background: #ffffff; border-color: #e2e8f0; box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12); }
+html.light nav .text-white { color: #0f172a; }
+html.light nav .text-white\/90 { color: rgb(15 23 42 / 0.9); }
+html.light nav .text-white\/80 { color: rgb(15 23 42 / 0.8); }
+html.light nav .text-white\/70 { color: rgb(15 23 42 / 0.7); }
+html.light nav .text-white\/60 { color: rgb(15 23 42 / 0.6); }
+html.light nav .text-white\/50 { color: rgb(15 23 42 / 0.5); }
+html.light nav .text-white\/40 { color: rgb(15 23 42 / 0.45); }
+html.light nav .text-white\/30 { color: rgb(15 23 42 / 0.4); }
+html.light nav .hover\:text-white:hover { color: #0f172a; }
+html.light nav :is(.bg-white\/\[0\.02\], .bg-white\/\[0\.03\], .bg-white\/\[0\.04\], .bg-white\/\[0\.05\], .bg-white\/\[0\.06\], .bg-white\/\[0\.08\]) { background: #f1f5f9; }
+html.light nav :is(.hover\:bg-white\/\[0\.03\]:hover, .hover\:bg-white\/\[0\.04\]:hover, .hover\:bg-white\/\[0\.05\]:hover, .hover\:bg-white\/\[0\.06\]:hover, .hover\:bg-white\/\[0\.08\]:hover) { background: #e2e8f0; }
+html.light nav :is(.border-white\/10, .border-white\/\[0\.06\], .border-white\/\[0\.04\], .border-white\/\[0\.08\]) { border-color: #e2e8f0; }
+
+/* Keep white text on gradient/colored chips inside the navbar */
+html.light nav :is(.bg-gradient-to-r, .bg-gradient-to-br, .bg-gradient-to-t).text-white,
+html.light nav :is(.bg-gradient-to-r, .bg-gradient-to-br, .bg-gradient-to-t) .text-white,
+html.light nav .bg-red-500.text-white,
+html.light nav .bg-red-500 .text-white { color: #ffffff !important; }
+
+/* Nav pills */
+html.light .nav-pill { color: rgba(15, 23, 42, 0.6); }
+html.light .nav-pill:hover { color: #0f172a; background: rgba(15, 23, 42, 0.05); }
+html.light .nav-pill.active { color: #7c3aed; background: rgba(168, 85, 247, 0.12); }
+html.light .nav-pill.active span { color: #7c3aed; }
+
+/* Colored text utilities -> darker shades for white backgrounds */
+html.light main .text-purple-300 { color: #7c3aed; }
+html.light main .text-purple-400 { color: #6d28d9; }
+html.light main .hover\:text-purple-300:hover { color: #7c3aed; }
+html.light main .text-violet-200 { color: #6d28d9; }
+html.light main .text-violet-300 { color: #6d28d9; }
+html.light main .text-violet-400 { color: #5b21b6; }
+html.light main .text-violet-400\/60 { color: rgb(91 33 182 / 0.6); }
+html.light main .text-primary-200 { color: #7c3aed; }
+html.light main .text-primary-300 { color: #7c3aed; }
+html.light main .text-primary-400 { color: #6d28d9; }
+html.light main .text-primary-400\/70 { color: rgb(109 40 217 / 0.7); }
+html.light main .text-primary-400\/80 { color: rgb(109 40 217 / 0.8); }
+html.light main .text-primary-400\/60 { color: rgb(109 40 217 / 0.6); }
+html.light main .text-primary-400\/50 { color: rgb(109 40 217 / 0.5); }
+html.light main .text-primary-400\/40 { color: rgb(109 40 217 / 0.4); }
+html.light main .text-primary-400\/20 { color: rgb(109 40 217 / 0.2); }
+html.light main .text-red-300 { color: #b91c1c; }
+html.light main .text-red-400 { color: #b91c1c; }
+html.light main .text-red-400\/80 { color: rgb(185 28 28 / 0.8); }
+html.light main .text-red-400\/50 { color: rgb(185 28 28 / 0.5); }
+html.light main .text-emerald-300 { color: #047857; }
+html.light main .text-emerald-400 { color: #047857; }
+html.light main .text-emerald-400\/60 { color: rgb(4 120 87 / 0.6); }
+html.light main .text-blue-300 { color: #1d4ed8; }
+html.light main .text-blue-500 { color: #1d4ed8; }
+html.light main .text-pink-300 { color: #be185d; }
+html.light main .text-pink-400 { color: #be185d; }
+html.light main .text-amber-300 { color: #b45309; }
+html.light main .text-orange-400 { color: #c2410c; }
+html.light main .text-yellow-400 { color: #a16207; }
+html.light main .text-slate-100 { color: #334155; }
+html.light main .text-slate-300 { color: #475569; }
+html.light main .text-slate-300\/70 { color: rgb(71 85 105 / 0.7); }
+html.light main .text-slate-400 { color: #64748b; }
+html.light main .text-slate-500 { color: #64748b; }
+html.light main .text-gray-400 { color: #64748b; }
+html.light main .text-gray-500 { color: #64748b; }
+
+/* Special hardcoded surfaces */
+html.light main .bg-\[\#081114\]\/95 { background: #eef2f7; border-color: #e2e8f0; }
+html.light main .text-\[\#DBEAFE\] { color: #1d4ed8; }
+
+/* Dark-purple chips (Betty AI modes, post tags) keep white text */
+html.light main .bg-\[\#2b1b40\] :is(.text-white, .text-white\/80, .text-violet-200) { color: #ffffff !important; }
+
+/* User message bubbles stay dark purple - keep content light */
+html.light main .message-user :is(.text-white, .text-white\/80, .text-white\/70) { color: #f8fafc; }
