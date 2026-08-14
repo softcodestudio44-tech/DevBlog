@@ -48,6 +48,8 @@ const BettyAI = () => {
   const [techStack, setTechStack] = useState([]);
   const [slowWarning, setSlowWarning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const slowTimerRef = useRef(null);
@@ -312,28 +314,65 @@ const BettyAI = () => {
 
   // Clear chat: UI only — saved history stays in the database
   const clearChat = () => {
-    if (!window.confirm('Clear the conversation from this screen? Your saved history will be kept.')) return;
-    setTechStack([]);
-    setMessages([WELCOME_MESSAGE]);
     setMenuOpen(false);
-    toast({ type: 'success', title: 'Chat cleared', body: 'Saved history was kept.' });
+    setConfirmAction({
+      type: 'clear',
+      title: 'Clear chat',
+      message: 'Remove all messages from this screen? Your saved history will be kept.',
+      confirmLabel: 'Clear',
+    });
   };
 
   // Delete history: permanently removes everything from the database
-  const deleteHistory = async () => {
+  const deleteHistory = () => {
     if (!user?.id) return;
-    if (!window.confirm('Permanently delete ALL Betty AI chat history? This cannot be undone.')) return;
-    try {
-      await supabase.from('betty_ai_messages').delete().eq('user_id', user.id);
-      await supabase.from('betty_conversations').delete().eq('user_id', user.id);
+    setMenuOpen(false);
+    setConfirmAction({
+      type: 'delete',
+      title: 'Delete chat history',
+      message: 'Delete all chat history permanently? This cannot be undone.',
+      confirmLabel: 'Delete',
+    });
+  };
+
+  const handleConfirm = async () => {
+    if (!confirmAction) return;
+
+    if (confirmAction.type === 'clear') {
       setTechStack([]);
       setMessages([WELCOME_MESSAGE]);
-      toast({ type: 'success', title: 'History deleted', body: 'All Betty AI history was permanently removed.' });
-    } catch (err) {
-      console.error('Error deleting Betty AI history:', err);
-      toast({ type: 'notification', title: 'Delete failed', body: 'Could not delete history. Try again.' });
+      setConfirmAction(null);
+      toast({ type: 'success', title: 'Chat cleared', body: 'All messages were removed from this screen.' });
+      return;
     }
-    setMenuOpen(false);
+
+    if (confirmAction.type === 'delete') {
+      if (!user?.id) return;
+      setDeleting(true);
+      try {
+        const { error: convError } = await supabase
+          .from('betty_conversations')
+          .delete()
+          .eq('user_id', user.id);
+        const { error: msgError } = await supabase
+          .from('betty_ai_messages')
+          .delete()
+          .eq('user_id', user.id);
+
+        if (msgError) throw msgError;
+        if (convError) console.warn('Could not clear conversation memory:', convError);
+
+        setTechStack([]);
+        setMessages([WELCOME_MESSAGE]);
+        setConfirmAction(null);
+        toast({ type: 'success', title: 'History deleted', body: 'All Betty AI history was permanently removed.' });
+      } catch (err) {
+        console.error('Error deleting Betty AI history:', err);
+        toast({ type: 'notification', title: 'Delete failed', body: 'Could not delete history. Try again.' });
+      } finally {
+        setDeleting(false);
+      }
+    }
   };
 
   // Export chat: download the full conversation as a .txt file
@@ -663,6 +702,54 @@ const BettyAI = () => {
           </p>
         </div>
       </div>
+
+      {/* Confirmation dialog */}
+      <AnimatePresence>
+        {confirmAction && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => { if (!deleting) setConfirmAction(null); }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="glass-strong w-full max-w-sm rounded-2xl p-6 shadow-2xl shadow-black/40"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-11 h-11 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center mb-4">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">{confirmAction.title}</h3>
+              <p className="text-sm text-white/60 mb-6">{confirmAction.message}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 rounded-xl glass text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={deleting}
+                  className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 ${
+                    confirmAction.type === 'delete'
+                      ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400'
+                      : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500'
+                  }`}
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 mx-auto animate-spin" /> : confirmAction.confirmLabel}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
