@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   website TEXT,
   tiktok TEXT,
   facebook TEXT,
+  last_seen TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -82,6 +83,8 @@ CREATE TABLE IF NOT EXISTS public.channels (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT UNIQUE NOT NULL,
   topic TEXT,
+  rules TEXT,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -94,6 +97,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
   channel_id UUID NOT NULL REFERENCES public.channels(id) ON DELETE CASCADE,
   author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   read_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -106,6 +110,7 @@ CREATE TABLE IF NOT EXISTS public.direct_messages (
   sender_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   recipient_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   read_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -126,6 +131,18 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 );
 
 -- =============================================
+-- CHANNEL_BANS (admin "remove user" = ban from posting)
+-- =============================================
+CREATE TABLE IF NOT EXISTS public.channel_bans (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  channel_id UUID NOT NULL REFERENCES public.channels(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  banned_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(channel_id, user_id)
+);
+
+-- =============================================
 -- INDEXES
 -- =============================================
 CREATE INDEX IF NOT EXISTS idx_posts_author_id ON public.posts(author_id);
@@ -142,6 +159,8 @@ CREATE INDEX IF NOT EXISTS idx_dm_sender_id ON public.direct_messages(sender_id)
 CREATE INDEX IF NOT EXISTS idx_dm_recipient_id ON public.direct_messages(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(read);
+CREATE INDEX IF NOT EXISTS idx_channel_bans_channel ON public.channel_bans(channel_id);
+CREATE INDEX IF NOT EXISTS idx_channel_bans_user ON public.channel_bans(user_id);
 
 -- =============================================
 -- UPDATED_AT TRIGGER FUNCTION
@@ -202,18 +221,20 @@ BEGIN
     NULLIF(NEW.raw_user_meta_data->>'picture', '')
   );
 
-  INSERT INTO public.profiles (id, email, name, avatar, role)
+  INSERT INTO public.profiles (id, email, name, avatar, role, last_seen)
   VALUES (
     NEW.id,
     _email,
     _name,
     _avatar,
-    CASE WHEN _email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
+    CASE WHEN _email IN ('softcodestudio44@gmail.com', 'sofcodestudio44@gmail.com') THEN 'admin' ELSE 'user' END,
+    now()
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     name = EXCLUDED.name,
-    avatar = COALESCE(public.profiles.avatar, EXCLUDED.avatar);
+    avatar = COALESCE(public.profiles.avatar, EXCLUDED.avatar),
+    role = CASE WHEN public.profiles.role = 'admin' THEN 'admin' ELSE EXCLUDED.role END;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -263,6 +284,7 @@ ALTER TABLE public.channels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.direct_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channel_bans ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: anyone can read, user can update own, user can create own (OAuth fallback)
 CREATE POLICY "Profiles are viewable by everyone"
@@ -327,6 +349,9 @@ CREATE POLICY "Authenticated users can create follows"
 CREATE POLICY "Users can delete own follows"
   ON public.follows FOR DELETE USING (auth.uid() = follower_id);
 
+CREATE POLICY "Profile owners can remove followers"
+  ON public.follows FOR DELETE USING (auth.uid() = following_id);
+
 -- Channels: anyone can read, authenticated can create
 CREATE POLICY "Channels are viewable by everyone"
   ON public.channels FOR SELECT USING (true);
@@ -374,6 +399,59 @@ CREATE POLICY "Users can read own notifications"
 CREATE POLICY "Users can update own notifications"
   ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
 
+-- Channel bans: readable by all, only admins can manage
+CREATE POLICY "Channel bans are viewable by everyone"
+  ON public.channel_bans FOR SELECT USING (true);
+
+CREATE POLICY "Admins can insert channel bans"
+  ON public.channel_bans FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can delete channel bans"
+  ON public.channel_bans FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+-- Messages: authors/admin can soft delete (deleted_at)
+CREATE POLICY "Users can update own messages"
+  ON public.messages FOR UPDATE USING (
+    auth.uid() = author_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+-- Direct messages: sender/admin can soft delete, recipient can mark as read
+CREATE POLICY "Users can update own sent DMs"
+  ON public.direct_messages FOR UPDATE USING (
+    auth.uid() = sender_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "DM recipients can mark DMs as read"
+  ON public.direct_messages FOR UPDATE USING (auth.uid() = recipient_id);
+
+-- Block banned users from posting in a channel
+CREATE OR REPLACE FUNCTION public.prevent_banned_messages()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.channel_bans
+    WHERE channel_id = NEW.channel_id AND user_id = NEW.author_id
+  ) THEN
+    RAISE EXCEPTION 'You have been removed from this channel and cannot post.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER prevent_banned_messages_trigger
+  BEFORE INSERT ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_banned_messages();
+
 -- =============================================
 -- REAL-TIME PUBLICATION
 -- =============================================
@@ -388,11 +466,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.follows;
 -- =============================================
 -- DEFAULT CHANNELS
 -- =============================================
-INSERT INTO public.channels (name, topic) VALUES
-  ('general', 'General discussion for all developers'),
-  ('help-support', 'Get help with your code and projects'),
-  ('showcase', 'Show off your projects and get feedback'),
-  ('random', 'Off-topic conversations and fun')
+INSERT INTO public.channels (name, topic, rules) VALUES
+  ('general', 'General discussion for all developers', 'Be respectful to all members\nNo spam or self-promotion\nKeep discussions tech-related\nNo sharing of private information\nAdmin decisions are final'),
+  ('help-support', 'Get help with your code and projects', 'Be respectful to all members\nNo spam or self-promotion\nKeep discussions tech-related\nNo sharing of private information\nAdmin decisions are final'),
+  ('showcase', 'Show off your projects and get feedback', 'Be respectful to all members\nNo spam or self-promotion\nKeep discussions tech-related\nNo sharing of private information\nAdmin decisions are final'),
+  ('random', 'Off-topic conversations and fun', 'Be respectful to all members\nNo spam or self-promotion\nKeep discussions tech-related\nNo sharing of private information\nAdmin decisions are final')
 ON CONFLICT (name) DO NOTHING;
 
 -- =============================================

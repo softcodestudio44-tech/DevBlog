@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Users, MessageCircle, User, Plus, Sparkles } from 'lucide-react';
+import { Home, Users, MessageCircle, User, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const BottomNav = () => {
@@ -19,12 +19,6 @@ const BottomNav = () => {
       active: path.startsWith('/community') || path === '/chat',
     },
     null,
-    {
-      to: '/betty-ai',
-      label: 'Betty AI',
-      icon: Sparkles,
-      active: path === '/betty-ai',
-    },
     {
       to: '/messages',
       label: 'Messages',

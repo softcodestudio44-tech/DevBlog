@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, MessageCircle, Heart, UserPlus, AtSign, Hash, X, CheckCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 
 const NotificationBell = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
@@ -31,6 +32,27 @@ const NotificationBell = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleNotificationClick = (notification) => {
+    if (!notification.read) markAsRead(notification.id);
+    setShowDropdown(false);
+
+    let path = null;
+    const type = notification.type;
+    if (type === 'like' || type === 'comment' || type === 'reply' || type === 'mention') {
+      path = notification.source_id ? `/post/${notification.source_id}` : null;
+    } else if (type === 'follow') {
+      const target = notification.actor_id || notification.source_id;
+      path = target ? `/user/${target}` : null;
+    } else if (type === 'message' || type === 'dm') {
+      const target = notification.actor_id || notification.source_id;
+      path = target ? `/messages?user=${target}` : '/messages';
+    } else if (type === 'channel') {
+      path = '/community';
+    }
+
+    if (path) navigate(path);
+  };
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -103,10 +125,7 @@ const NotificationBell = () => {
                         className={`block p-4 border-b border-white/[0.02] cursor-pointer transition-all hover:bg-white/[0.02] ${
                           !notification.read ? 'bg-primary/[0.02]' : ''
                         }`}
-                        onClick={() => {
-                          markAsRead(notification.id);
-                          setShowDropdown(false);
-                        }}
+                        onClick={() => handleNotificationClick(notification)}
                       >
                         <div className="flex gap-3">
                           {notification.actor?.avatar ? (

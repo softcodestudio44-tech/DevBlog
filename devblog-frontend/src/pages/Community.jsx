@@ -2,17 +2,39 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   MessageCircle, Send, Users, Hash, Menu, X, 
-  Trash2, Paperclip, Search, CornerUpLeft
+  Trash2, Paperclip, Search, CornerUpLeft, MoreVertical, Shield, BookOpen, Pencil
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import ConfirmDialog from '../components/ConfirmDialog';
+import OnlineDot from '../components/OnlineDot';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useMessages } from '../hooks/useMessages';
+import { isAdminUser, isAdminEmail } from '../lib/admin';
 
 const CHANNEL_ROOM_KEY = 'devblog-community-active-room';
 
+const DEFAULT_RULES = [
+  'Be respectful to all members',
+  'No spam or self-promotion',
+  'Keep discussions tech-related',
+  'No sharing of private information',
+  'Admin decisions are final',
+];
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+const getChannelRules = (channel) => {
+  if (channel?.rules && channel.rules.trim()) {
+    return channel.rules.split('\n').map((r) => r.trim()).filter(Boolean);
+  }
+  return DEFAULT_RULES;
+};
+
 const Community = () => {
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   
   const [channels, setChannels] = useState([]);
@@ -29,15 +51,32 @@ const Community = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [replyTo, setReplyTo] = useState(null);
+  const [rulesOpen, setRulesOpen] = useState(true);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [menuMsgId, setMenuMsgId] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [editRulesOpen, setEditRulesOpen] = useState(false);
+  const [rulesDraft, setRulesDraft] = useState('');
+  const [busy, setBusy] = useState(false);
   
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimerRef = useRef(null);
 
-  const isAdmin = user?.email === 'sofcodestudio44@gmail.com' || user?.role === 'admin';
+  const isAdmin = isAdminUser(user);
 
   // Use the messages hook with the active channel
   const { messages: channelMessages, sendMessage, deleteMessage, loading: messagesLoading } = useMessages(activeChannel?.id);
+
+  // Reset the rules banner + menus whenever the channel changes
+  useEffect(() => {
+    if (activeChannel?.id) {
+      const dismissed = localStorage.getItem(`devblog-rules-dismissed-${activeChannel.id}`);
+      setRulesOpen(!dismissed);
+    }
+    setHeaderMenuOpen(false);
+    setMenuMsgId(null);
+  }, [activeChannel?.id]);
 
   // Fetch channels
   useEffect(() => {
@@ -73,6 +112,8 @@ const Community = () => {
     setActiveChannel(channel);
     setReplyTo(null);
     setShowSidebar(false);
+    setMenuMsgId(null);
+    setHeaderMenuOpen(false);
     localStorage.setItem(CHANNEL_ROOM_KEY, channel.id);
   };
 
@@ -91,62 +132,214 @@ const Community = () => {
       ? `> ${replyTo.content}\n\n${newMessage.trim()}`
       : newMessage.trim();
 
-    await sendMessage(content);
+    const res = await sendMessage(content);
+    if (res?.error) {
+      toast({ type: 'notification', title: 'Could not send message', body: res.error });
+      return;
+    }
     setNewMessage('');
     setReplyTo(null);
     if (inputRef.current) inputRef.current.focus();
   };
 
-  const handleTyping = (e) => {
-    setNewMessage(e.target.value);
-  };
-
   const handleReplyToMessage = (message) => {
+    setMenuMsgId(null);
     setReplyTo({ id: message.id, authorName: message.author?.name || 'Message', content: message.content });
     if (inputRef.current) inputRef.current.focus();
   };
 
   const clearReply = () => setReplyTo(null);
 
-  const handleDeleteMessage = async (messageId) => {
-    if (!messageId) return;
-    if (!window.confirm('Delete this message?')) return;
-    try {
-      await deleteMessage(messageId);
-    } catch (err) {
-      console.error('Delete message failed:', err);
+  // ---- Message deletion (issue 4) ----
+  const askDeleteMessage = (message, mode) => {
+    setMenuMsgId(null);
+    if (mode === 'everyone') {
+      setConfirm({
+        type: 'deleteMessage',
+        mode,
+        messageId: message.id,
+        title: 'Delete message for everyone?',
+        message: 'This will remove the message for everyone in the channel.',
+        confirmLabel: 'Delete',
+      });
+    } else if (mode === 'hard') {
+      setConfirm({
+        type: 'deleteMessage',
+        mode,
+        messageId: message.id,
+        title: 'Delete this message?',
+        message: 'This will permanently remove the message from the channel.',
+        confirmLabel: 'Delete',
+      });
+    } else {
+      // Delete for me - no confirmation needed, but confirm per spec
+      setConfirm({
+        type: 'deleteMessage',
+        mode,
+        messageId: message.id,
+        title: 'Delete message for me?',
+        message: 'This will only hide the message for you.',
+        confirmLabel: 'Delete',
+      });
     }
   };
 
-  const handleDeleteChannel = async (e, channel) => {
-    e.stopPropagation();
-    if (!window.confirm(`Delete #${channel.name}? This will permanently remove the channel and all its messages.`)) return;
+  const confirmDeleteMessage = async () => {
+    if (!confirm?.messageId) return;
+    setBusy(true);
+    const ok = await deleteMessage(confirm.messageId, { mode: confirm.mode || 'everyone' });
+    setBusy(false);
+    if (ok) {
+      toast({ type: 'success', title: 'Message deleted', body: confirm.mode === 'me' ? 'Hidden from your view.' : 'Removed from the channel.' });
+    } else {
+      toast({ type: 'notification', title: 'Delete failed', body: 'Could not delete the message.' });
+    }
+    setConfirm(null);
+  };
+
+  // ---- Admin: remove user (ban from posting) ----
+  const askRemoveUser = (message) => {
+    setMenuMsgId(null);
+    const name = message.author?.name || 'this user';
+    setConfirm({
+      type: 'removeUser',
+      userId: message.author_id,
+      title: `Remove ${name}?`,
+      message: `${name} will no longer be able to post in #${activeChannel?.name}.`,
+      confirmLabel: 'Remove',
+    });
+  };
+
+  const confirmRemoveUser = async () => {
+    if (!confirm?.userId || !activeChannel) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from('channel_bans')
+        .insert({
+          channel_id: activeChannel.id,
+          user_id: confirm.userId,
+          banned_by: user?.id,
+        });
+      if (error) throw error;
+      toast({ type: 'success', title: 'User removed', body: `${confirm.title.replace('Remove ', '').replace('?', '')} was removed from #${activeChannel.name}.` });
+      setConfirm(null);
+    } catch (err) {
+      console.error('Failed to remove user:', err);
+      toast({ type: 'notification', title: 'Remove failed', body: err.message || 'Could not remove the user.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Admin: clear channel (delete all messages) ----
+  const askClearChannel = () => {
+    setHeaderMenuOpen(false);
+    setConfirm({
+      type: 'clearChannel',
+      title: `Clear #${activeChannel?.name}?`,
+      message: 'This will permanently delete all messages in this channel.',
+      confirmLabel: 'Clear',
+    });
+  };
+
+  const confirmClearChannel = async () => {
+    if (!activeChannel) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('channel_id', activeChannel.id);
+      if (error) throw error;
+      toast({ type: 'success', title: 'Channel cleared', body: `All messages in #${activeChannel.name} were deleted.` });
+      setConfirm(null);
+    } catch (err) {
+      console.error('Failed to clear channel:', err);
+      toast({ type: 'notification', title: 'Clear failed', body: err.message || 'Could not clear the channel.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Admin: delete entire channel ----
+  const askDeleteChannel = () => {
+    setHeaderMenuOpen(false);
+    setConfirm({
+      type: 'deleteChannel',
+      title: `Delete #${activeChannel?.name}?`,
+      message: 'This will permanently remove the channel and all its messages.',
+      confirmLabel: 'Delete',
+    });
+  };
+
+  const confirmDeleteChannel = async () => {
+    if (!activeChannel) return;
+    setBusy(true);
     try {
       const { error } = await supabase
         .from('channels')
         .delete()
-        .eq('id', channel.id);
+        .eq('id', activeChannel.id);
       if (error) throw error;
-      
-      // Remove from local state
-      const updated = channels.filter(c => c.id !== channel.id);
+
+      const updated = channels.filter(c => c.id !== activeChannel.id);
       setChannels(updated);
-      
-      // If deleted channel was active, switch to general or first available
-      if (activeChannel?.id === channel.id) {
-        const generalRoom = updated.find(c => c.name === 'general');
-        const nextRoom = generalRoom || updated[0];
-        if (nextRoom) {
-          setActiveChannel(nextRoom);
-          localStorage.setItem(CHANNEL_ROOM_KEY, nextRoom.id);
-        } else {
-          setActiveChannel(null);
-          localStorage.removeItem(CHANNEL_ROOM_KEY);
-        }
+
+      const generalRoom = updated.find(c => c.name === 'general');
+      const nextRoom = generalRoom || updated[0];
+      if (nextRoom) {
+        setActiveChannel(nextRoom);
+        localStorage.setItem(CHANNEL_ROOM_KEY, nextRoom.id);
+      } else {
+        setActiveChannel(null);
+        localStorage.removeItem(CHANNEL_ROOM_KEY);
       }
+      toast({ type: 'success', title: 'Channel deleted', body: 'The channel and its messages were removed.' });
+      setConfirm(null);
     } catch (err) {
       console.error('Failed to delete channel:', err);
-      alert('Failed to delete channel: ' + (err.message || 'Unknown error'));
+      toast({ type: 'notification', title: 'Delete failed', body: err.message || 'Could not delete the channel.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Rules (issue 3) ----
+  const dismissRules = () => {
+    if (activeChannel?.id) {
+      localStorage.setItem(`devblog-rules-dismissed-${activeChannel.id}`, '1');
+    }
+    setRulesOpen(false);
+  };
+
+  const canManageRules = isAdmin || activeChannel?.created_by === user?.id;
+
+  const openEditRules = () => {
+    setHeaderMenuOpen(false);
+    setRulesDraft(getChannelRules(activeChannel).join('\n'));
+    setEditRulesOpen(true);
+  };
+
+  const saveRules = async (e) => {
+    e.preventDefault();
+    if (!activeChannel) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from('channels')
+        .update({ rules: rulesDraft.trim() })
+        .eq('id', activeChannel.id);
+      if (error) throw error;
+      setChannels(prev => prev.map(c => c.id === activeChannel.id ? { ...c, rules: rulesDraft.trim() } : c));
+      setActiveChannel(prev => prev ? { ...prev, rules: rulesDraft.trim() } : prev);
+      setEditRulesOpen(false);
+      toast({ type: 'success', title: 'Rules updated', body: 'Channel rules were saved.' });
+    } catch (err) {
+      console.error('Failed to save rules:', err);
+      toast({ type: 'notification', title: 'Save failed', body: err.message || 'Could not save rules.' });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -236,9 +429,9 @@ const Community = () => {
                   </div>
                   {isAdmin && (
                     <button
-                      onClick={(e) => handleDeleteChannel(e, channel)}
+                      onClick={(e) => { e.stopPropagation(); setActiveChannel(channel); setHeaderMenuOpen(true); }}
                       className="p-1.5 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
-                      title={`Delete #${channel.name}`}
+                      title={`Manage #${channel.name}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -271,8 +464,58 @@ const Community = () => {
               <Hash className="w-5 h-5 text-primary-400" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-white text-sm">{activeChannel.name}</h3>
+              <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+                {activeChannel.name}
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/15 border border-primary/25 text-[9px] font-bold text-primary-300 uppercase tracking-wider">
+                    <Shield className="w-2.5 h-2.5" /> Admin
+                  </span>
+                )}
+              </h3>
               <p className="text-xs text-white/40 truncate">{activeChannel.topic}</p>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => { setHeaderMenuOpen(o => !o); setMenuMsgId(null); }}
+                className="p-2 rounded-lg hover:bg-white/5 text-white/50 hover:text-white transition-colors"
+                aria-label="Channel options"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+              {headerMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setHeaderMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl glass-strong shadow-xl shadow-black/40 p-1.5">
+                    {canManageRules && (
+                      <button
+                        onClick={openEditRules}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.05] transition-all"
+                      >
+                        <BookOpen className="w-4 h-4 text-primary-400" />
+                        Edit rules
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={askClearChannel}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.05] transition-all"
+                      >
+                        <Trash2 className="w-4 h-4 text-amber-400" />
+                        Clear channel
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={askDeleteChannel}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                        Delete channel
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -288,6 +531,42 @@ const Community = () => {
                     <h2 className="text-lg font-semibold text-white">#{activeChannel.name}</h2>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Rules banner (issue 3) */}
+            {activeChannel && rulesOpen && (
+              <div className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-4 shadow-lg shadow-black/10">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <BookOpen className="w-4 h-4 text-violet-300" />
+                    Channel rules
+                  </div>
+                  <button
+                    onClick={dismissRules}
+                    className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                    aria-label="Dismiss rules"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <ul className="space-y-1">
+                  {getChannelRules(activeChannel).map((rule, i) => (
+                    <li key={i} className="text-xs text-white/60 flex items-start gap-2">
+                      <span className="text-violet-300/70 mt-0.5">•</span>
+                      {rule}
+                    </li>
+                  ))}
+                </ul>
+                {canManageRules && (
+                  <button
+                    onClick={openEditRules}
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-200 transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Edit rules
+                  </button>
+                )}
               </div>
             )}
             
@@ -306,14 +585,25 @@ const Community = () => {
               const showHeader = !prevMsg || prevMsg.author_id !== msg.author_id ||
                 (new Date(msg.created_at) - new Date(prevMsg.created_at)) > 300000;
               const isOwn = msg.author_id === user?.id;
-              const canDelete = isOwn || isAdmin;
+              const isDeleted = !!msg.deleted_at;
+              const withinHour = (Date.now() - new Date(msg.created_at).getTime()) <= ONE_HOUR_MS;
+
+              const menuOptions = [];
+              if (isOwn) {
+                if (withinHour) menuOptions.push({ label: 'Delete for everyone', type: 'everyone' });
+                menuOptions.push({ label: 'Delete for me', type: 'me' });
+              }
+              if (isAdmin) {
+                if (msg.author_id !== user?.id) menuOptions.push({ label: 'Remove user', type: 'removeUser' });
+                menuOptions.push({ label: 'Delete message', type: 'hard' });
+              }
 
               return (
                 <div key={msg.id} className={`group ${showHeader ? 'mt-4' : 'mt-0.5'} flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                   <div className="max-w-[75%]">
                     {showHeader && (
                       <div className="flex gap-3 mb-2 items-center">
-                        <Link to={`/user/${msg.author_id}`} className="flex-shrink-0 self-start mt-0.5">
+                        <Link to={`/user/${msg.author_id}`} className="relative flex-shrink-0 self-start mt-0.5">
                           {msg.author?.avatar ? (
                             <img src={msg.author.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
                           ) : (
@@ -321,31 +611,79 @@ const Community = () => {
                               {msg.author?.name?.[0] || 'U'}
                             </div>
                           )}
+                          <OnlineDot userId={msg.author_id} />
                         </Link>
                         <div className="min-w-0">
-                          <div className="flex items-baseline gap-2 mb-0.5">
+                          <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
                             <Link to={`/user/${msg.author_id}`} className="text-sm font-semibold text-primary-300/80 hover:text-primary-300 hover:underline truncate">
                               {msg.author?.name}
                             </Link>
+                            {isAdminEmail(msg.author?.email) && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-primary/15 border border-primary/25 text-[9px] font-bold text-primary-300 uppercase tracking-wider">
+                                <Shield className="w-2.5 h-2.5" /> Admin
+                              </span>
+                            )}
                             <span className="text-[10px] text-white/25">{formatTime(msg.created_at)}</span>
                           </div>
                         </div>
                       </div>
                     )}
                     <div className="relative">
-                      <div className={`px-4 py-3 rounded-3xl ${isOwn ? 'bg-[#3d2460] text-white rounded-br-sm' : 'bg-[#1a1d27] text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
-                        <MarkdownRenderer content={msg.content} />
-                      </div>
-                      <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
-                          <CornerUpLeft className="w-4 h-4" />
-                        </button>
-                        {canDelete && (
-                          <button onClick={() => handleDeleteMessage(msg.id)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      {isDeleted ? (
+                        <div className="px-4 py-3 rounded-3xl bg-white/[0.04] text-white/30 italic text-sm">
+                          This message was deleted
+                        </div>
+                      ) : (
+                        <>
+                          <div className={`px-4 py-3 rounded-3xl ${isOwn ? 'bg-[#3d2460] text-white rounded-br-sm' : 'bg-[#1a1d27] text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
+                            <MarkdownRenderer content={msg.content} />
+                          </div>
+                          <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
+                              <CornerUpLeft className="w-4 h-4" />
+                            </button>
+                            {menuOptions.length > 0 && (
+                              <div className="relative">
+                                <button
+                                  onClick={() => setMenuMsgId(menuMsgId === msg.id ? null : msg.id)}
+                                  type="button"
+                                  className="p-1 rounded-full hover:bg-white/10 text-white/50"
+                                  aria-label="Message options"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                                {menuMsgId === msg.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setMenuMsgId(null)} />
+                                    <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-xl glass-strong shadow-xl shadow-black/40 p-1.5">
+                                      {menuOptions.map((opt) => (
+                                        <button
+                                          key={opt.type}
+                                          type="button"
+                                          onClick={() => {
+                                            if (opt.type === 'removeUser') askRemoveUser(msg);
+                                            else if (opt.type === 'everyone') askDeleteMessage(msg, 'everyone');
+                                            else if (opt.type === 'me') askDeleteMessage(msg, 'me');
+                                            else askDeleteMessage(msg, 'hard');
+                                          }}
+                                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                                            opt.type === 'removeUser'
+                                              ? 'text-white/70 hover:text-red-400 hover:bg-red-500/10'
+                                              : 'text-white/70 hover:text-white hover:bg-white/[0.05]'
+                                          }`}
+                                        >
+                                          <Trash2 className={`w-3.5 h-3.5 ${opt.type === 'removeUser' ? 'text-red-400/80' : 'text-white/40'}`} />
+                                          {opt.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -381,7 +719,7 @@ const Community = () => {
                   placeholder={activeChannel ? `Message #${activeChannel.name}...` : 'Select a channel...'}
                   className="w-full bg-white/[0.04] border border-white/[0.06] rounded-full px-5 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/30 focus:bg-white/[0.06] transition-all"
                   value={newMessage}
-                  onChange={handleTyping}
+                  onChange={(e) => setNewMessage(e.target.value)}
                   disabled={!activeChannel}
                 />
               </div>
@@ -400,6 +738,60 @@ const Community = () => {
           </div>
         )}
       </div>
+
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel || 'Delete'}
+        loading={busy}
+        onCancel={() => { if (!busy) setConfirm(null); }}
+        onConfirm={() => {
+          if (!confirm) return;
+          if (confirm.type === 'deleteMessage') confirmDeleteMessage();
+          else if (confirm.type === 'removeUser') confirmRemoveUser();
+          else if (confirm.type === 'clearChannel') confirmClearChannel();
+          else if (confirm.type === 'deleteChannel') confirmDeleteChannel();
+        }}
+      />
+
+      {/* Edit rules modal (issue 3) */}
+      {editRulesOpen && activeChannel && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => { if (!busy) setEditRulesOpen(false); }}>
+          <form
+            onSubmit={saveRules}
+            className="glass-strong w-full max-w-md rounded-2xl p-6 shadow-2xl shadow-black/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-violet-300" />
+                Edit rules for #{activeChannel.name}
+              </h3>
+              <button type="button" onClick={() => setEditRulesOpen(false)} className="p-2 rounded-lg hover:bg-white/10 text-white/60 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <textarea
+              rows={6}
+              value={rulesDraft}
+              onChange={(e) => setRulesDraft(e.target.value)}
+              placeholder={DEFAULT_RULES.join('\n')}
+              className="input-glass resize-none"
+            />
+            <p className="text-[11px] text-white/30 mt-2">One rule per line.</p>
+            <div className="flex gap-3 mt-4">
+              <button type="button" onClick={() => setEditRulesOpen(false)} disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl glass text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.06] transition-all disabled:opacity-50">
+                Cancel
+              </button>
+              <button type="submit" disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-sm font-semibold text-white transition-all disabled:opacity-50">
+                Save rules
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

@@ -4,6 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { sendNotification } from '../lib/notify';
 import { isOnline, enqueueAction } from '../lib/offline';
 
+const DM_SELECT = `
+  *,
+  sender:profiles!direct_messages_sender_id_fkey(id, name, avatar, email),
+  recipient:profiles!direct_messages_recipient_id_fkey(id, name, avatar, email)
+`;
+
 export const useDirectMessages = (otherUserId) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
@@ -29,11 +35,7 @@ export const useDirectMessages = (otherUserId) => {
     try {
       const { data, error } = await supabase
         .from('direct_messages')
-        .select(`
-          *,
-          sender:profiles!direct_messages_sender_id_fkey(id, name, avatar, email),
-          recipient:profiles!direct_messages_recipient_id_fkey(id, name, avatar, email)
-        `)
+        .select(DM_SELECT)
         .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
@@ -63,11 +65,16 @@ export const useDirectMessages = (otherUserId) => {
           table: 'direct_messages',
           filter: `and(sender_id=eq.${user.id},recipient_id=eq.${otherUserId})`,
         },
-        (payload) => {
-          const newMessage = payload.new;
+        async (payload) => {
+          const { data, error } = await supabase
+            .from('direct_messages')
+            .select(DM_SELECT)
+            .eq('id', payload.new.id)
+            .single();
+          if (error || !data) return;
           setMessages((prev) => {
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
+            if (prev.some((m) => m.id === data.id)) return prev;
+            return [...prev, data];
           });
         }
       )
@@ -79,12 +86,45 @@ export const useDirectMessages = (otherUserId) => {
           table: 'direct_messages',
           filter: `and(sender_id=eq.${otherUserId},recipient_id=eq.${user.id})`,
         },
-        (payload) => {
-          const newMessage = payload.new;
+        async (payload) => {
+          const { data, error } = await supabase
+            .from('direct_messages')
+            .select(DM_SELECT)
+            .eq('id', payload.new.id)
+            .single();
+          if (error || !data) return;
           setMessages((prev) => {
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
+            if (prev.some((m) => m.id === data.id)) return prev;
+            return [...prev, data];
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'direct_messages',
+          filter: `and(sender_id=eq.${user.id},recipient_id=eq.${otherUserId})`,
+        },
+        (payload) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === payload.new.id ? { ...m, ...payload.new } : m))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'direct_messages',
+          filter: `and(sender_id=eq.${otherUserId},recipient_id=eq.${user.id})`,
+        },
+        (payload) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === payload.new.id ? { ...m, ...payload.new } : m))
+          );
         }
       )
       .subscribe();
@@ -134,11 +174,7 @@ export const useDirectMessages = (otherUserId) => {
             sender_id: user.id,
             recipient_id: otherUserId,
           })
-          .select(`
-            *,
-            sender:profiles!direct_messages_sender_id_fkey(id, name, avatar, email),
-            recipient:profiles!direct_messages_recipient_id_fkey(id, name, avatar, email)
-          `)
+          .select(DM_SELECT)
           .single();
 
         if (error) throw error;
@@ -156,7 +192,7 @@ export const useDirectMessages = (otherUserId) => {
       } catch (err) {
         console.error('Error sending DM:', err);
         setError(err.message);
-        return null;
+        return { error: err.message };
       }
     },
     [otherUserId, user?.id]
@@ -180,15 +216,33 @@ export const useDirectMessages = (otherUserId) => {
     }
   }, [otherUserId, user?.id]);
 
-  // Delete a DM
+  // Delete a DM.
+  // mode 'everyone' -> soft delete (deleted_at) visible to everyone.
+  // mode 'me'       -> hide it locally only.
+  // mode 'hard'     -> permanently remove the row (admin).
   const deleteMessage = useCallback(
-    async (messageId) => {
+    async (messageId, { mode = 'everyone' } = {}) => {
       try {
-        const { error } = await supabase
-          .from('direct_messages')
-          .delete()
-          .eq('id', messageId);
-        if (error) throw error;
+        if (mode === 'hard') {
+          const { error } = await supabase
+            .from('direct_messages')
+            .delete()
+            .eq('id', messageId);
+          if (error) throw error;
+          setMessages((prev) => prev.filter((m) => m.id !== messageId));
+          return true;
+        }
+
+        if (mode === 'everyone') {
+          const { error } = await supabase
+            .from('direct_messages')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', messageId);
+          if (error) throw error;
+          return true;
+        }
+
+        // mode 'me'
         setMessages((prev) => prev.filter((m) => m.id !== messageId));
         return true;
       } catch (err) {

@@ -66,6 +66,8 @@ export const useNotifications = () => {
             return [newNotification, ...prev];
           });
           setUnreadCount((prev) => prev + 1);
+          // Re-fetch so the realtime row gets its actor profile join populated
+          fetchNotifications();
         }
       )
       .subscribe();

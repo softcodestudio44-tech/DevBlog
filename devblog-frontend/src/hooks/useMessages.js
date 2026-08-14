@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { isOnline, enqueueAction } from '../lib/offline';
 
+const MESSAGE_SELECT = `*, author:profiles(id, name, avatar, email)`;
+
 export const useMessages = (channelId) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
@@ -28,10 +30,7 @@ export const useMessages = (channelId) => {
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select(`
-          *,
-          author:profiles(id, name, avatar, email)
-        `)
+        .select(MESSAGE_SELECT)
         .eq('channel_id', channelId)
         .order('created_at', { ascending: true });
 
@@ -61,12 +60,32 @@ export const useMessages = (channelId) => {
           table: 'messages',
           filter: `channel_id=eq.${channelId}`,
         },
-        (payload) => {
-          const newMessage = payload.new;
+        async (payload) => {
+          const { data, error } = await supabase
+            .from('messages')
+            .select(MESSAGE_SELECT)
+            .eq('id', payload.new.id)
+            .single();
+          if (error || !data) return;
           setMessages((prev) => {
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
+            if (prev.some((m) => m.id === data.id)) return prev;
+            return [...prev, data];
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const updated = payload.new;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
+          );
         }
       )
       .on(
@@ -128,10 +147,7 @@ export const useMessages = (channelId) => {
             channel_id: channelId,
             author_id: user.id,
           })
-          .select(`
-            *,
-            author:profiles(id, name, avatar, email)
-          `)
+          .select(MESSAGE_SELECT)
           .single();
 
         if (error) throw error;
@@ -139,21 +155,39 @@ export const useMessages = (channelId) => {
       } catch (err) {
         console.error('Error sending message:', err);
         setError(err.message);
-        return null;
+        return { error: err.message };
       }
     },
     [channelId, user?.id]
   );
 
-  // Delete a message
+  // Delete a message.
+  // mode 'everyone' -> soft delete (deleted_at) visible to everyone.
+  // mode 'me'       -> hide it locally only.
+  // mode 'hard'     -> permanently remove the row (admin).
   const deleteMessage = useCallback(
-    async (messageId) => {
+    async (messageId, { mode = 'everyone' } = {}) => {
       try {
-        const { error } = await supabase
-          .from('messages')
-          .delete()
-          .eq('id', messageId);
-        if (error) throw error;
+        if (mode === 'hard') {
+          const { error } = await supabase
+            .from('messages')
+            .delete()
+            .eq('id', messageId);
+          if (error) throw error;
+          setMessages((prev) => prev.filter((m) => m.id !== messageId));
+          return true;
+        }
+
+        if (mode === 'everyone') {
+          const { error } = await supabase
+            .from('messages')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', messageId);
+          if (error) throw error;
+          return true;
+        }
+
+        // mode 'me'
         setMessages((prev) => prev.filter((m) => m.id !== messageId));
         return true;
       } catch (err) {

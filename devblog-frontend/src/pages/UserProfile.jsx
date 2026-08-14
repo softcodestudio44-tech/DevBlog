@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield, MapPin, Camera, Save, Loader2, Activity as ActivityIcon, User } from 'lucide-react';
+import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield, MapPin, Camera, Save, Loader2, Activity as ActivityIcon, User, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import GlassCard from '../components/GlassCard';
+import OnlineDot from '../components/OnlineDot';
 import { sendNotification } from '../lib/notify';
 import { uploadCover, uploadAvatar } from '../lib/storage';
+import { isAdminUser } from '../lib/admin';
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -20,6 +22,8 @@ const UserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const [showModal, setShowModal] = useState(null); // 'followers' or 'following' or null
+  const [followMap, setFollowMap] = useState({}); // { [userId]: true } - which listed users current user follows
+  const [actionLoading, setActionLoading] = useState(null); // userId being acted on in the modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -57,9 +61,6 @@ const UserProfile = () => {
           const followerId = payload.new?.follower_id;
           // Skip own follow action (already handled optimistically)
           if (!followerId || followerId === currentUser?.id) return;
-          setProfile((prev) =>
-            prev ? { ...prev, followersCount: (prev.followersCount || 0) + 1 } : prev
-          );
           try {
             const { data } = await supabase
               .from('profiles')
@@ -72,6 +73,17 @@ const UserProfile = () => {
                   ? { ...prev, followersList: [data, ...(prev.followersList || [])] }
                   : prev
               );
+              if (currentUser?.id) {
+                const { data: rel } = await supabase
+                  .from('follows')
+                  .select('id')
+                  .eq('follower_id', currentUser.id)
+                  .eq('following_id', followerId)
+                  .maybeSingle();
+                if (rel) {
+                  setFollowMap((prev) => ({ ...prev, [followerId]: true }));
+                }
+              }
             }
           } catch (err) {
             console.error('Error fetching new follower:', err);
@@ -93,9 +105,55 @@ const UserProfile = () => {
             prev
               ? {
                   ...prev,
-                  followersCount: Math.max(0, (prev.followersCount || 0) - 1),
                   followersList: (prev.followersList || []).filter((f) => f.id !== followerId),
                 }
+              : prev
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'follows',
+          filter: `follower_id=eq.${id}`,
+        },
+        async (payload) => {
+          const followingId = payload.new?.following_id;
+          if (!followingId || followingId === currentUser?.id) return;
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('id, name, avatar, email')
+              .eq('id', followingId)
+              .single();
+            if (data) {
+              setProfile((prev) =>
+                prev && !(prev.followingList || []).some((f) => f.id === data.id)
+                  ? { ...prev, followingList: [data, ...(prev.followingList || [])] }
+                  : prev
+              );
+            }
+          } catch (err) {
+            console.error('Error fetching new following:', err);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'follows',
+          filter: `follower_id=eq.${id}`,
+        },
+        (payload) => {
+          const followingId = payload.old?.following_id;
+          if (!followingId || followingId === currentUser?.id) return;
+          setProfile((prev) =>
+            prev
+              ? { ...prev, followingList: (prev.followingList || []).filter((f) => f.id !== followingId) }
               : prev
           );
         }
@@ -133,22 +191,12 @@ const UserProfile = () => {
         .order('created_at', { ascending: false });
       if (postsError) throw postsError;
 
-      // Get counts
+      // Get count of published posts
       const { count: postCount } = await supabase
         .from('posts')
         .select('id', { count: 'exact', head: true })
         .eq('author_id', id)
         .eq('is_draft', false);
-
-      const { count: followersCount } = await supabase
-        .from('follows')
-        .select('id', { count: 'exact', head: true })
-        .eq('following_id', id);
-
-      const { count: followingCount } = await supabase
-        .from('follows')
-        .select('id', { count: 'exact', head: true })
-        .eq('follower_id', id);
 
       // Check if current user follows this profile
       let isFollowing = false;
@@ -162,18 +210,41 @@ const UserProfile = () => {
         isFollowing = !!followData;
       }
 
-      // Get followers and following lists
-      const { data: followersData } = await supabase
-        .from('follows')
-        .select('follower:profiles(id, name, avatar, email)')
-        .eq('following_id', id)
-        .limit(10);
+      // Get full followers and following lists.
+      // NOTE: explicit FK hints are required because follows has two FKs to profiles.
+      const [
+        { data: followersData, error: followersError },
+        { data: followingData, error: followingError },
+      ] = await Promise.all([
+        supabase
+          .from('follows')
+          .select('follower:profiles!follows_follower_id_fkey(id, name, avatar, email)')
+          .eq('following_id', id),
+        supabase
+          .from('follows')
+          .select('following:profiles!follows_following_id_fkey(id, name, avatar, email)')
+          .eq('follower_id', id),
+      ]);
+      if (followersError) console.error('Followers query error:', followersError);
+      if (followingError) console.error('Following query error:', followingError);
 
-      const { data: followingData } = await supabase
-        .from('follows')
-        .select('following:profiles(id, name, avatar, email)')
-        .eq('follower_id', id)
-        .limit(10);
+      const followersList = (followersData || []).map((f) => f.follower).filter(Boolean);
+      const followingList = (followingData || []).map((f) => f.following).filter(Boolean);
+
+      // Determine which listed users the current user already follows (for modal buttons)
+      let followMap = {};
+      if (currentUser?.id && currentUser.id !== id) {
+        const ids = [...new Set([...followersList, ...followingList].map((u) => u.id))];
+        if (ids.length) {
+          const { data: myFollows } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', currentUser.id)
+            .in('following_id', ids);
+          followMap = Object.fromEntries((myFollows || []).map((r) => [r.following_id, true]));
+        }
+      }
+      setFollowMap(followMap);
 
       // Activity feed: recent likes, comments on posts, and new followers
       const [{ data: likesData }, { data: commentsData }, { data: newFollowers }] = await Promise.all([
@@ -240,14 +311,14 @@ const UserProfile = () => {
 
       setProfile({
         ...profileData,
-        isAdmin: profileData.email === 'sofcodestudio44@gmail.com' || profileData.role === 'admin',
+        isAdmin: isAdminUser(profileData),
         postCount: postCount || 0,
-        followersCount: followersCount || 0,
-        followingCount: followingCount || 0,
         likeCount,
         isFollowing,
-        followersList: (followersData || []).map(f => f.follower),
-        followingList: (followingData || []).map(f => f.following),
+        followersList,
+        followingList,
+        followersCount: followersList.length,
+        followingCount: followingList.length,
       });
       setPosts(transformedPosts);
       setActivity(items);
@@ -273,7 +344,7 @@ const UserProfile = () => {
         setProfile(prev => ({
           ...prev,
           isFollowing: false,
-          followersCount: (prev.followersCount || 0) - 1,
+          followersList: (prev.followersList || []).filter(f => f.id !== currentUser.id),
         }));
       } else {
         const { error } = await supabase
@@ -293,7 +364,12 @@ const UserProfile = () => {
         setProfile(prev => ({
           ...prev,
           isFollowing: true,
-          followersCount: (prev.followersCount || 0) + 1,
+          followersList: (prev.followersList || []).some(f => f.id === currentUser.id)
+            ? prev.followersList
+            : [
+                { id: currentUser.id, name: currentUser.name, avatar: currentUser.avatar, email: currentUser.email },
+                ...(prev.followersList || []),
+              ],
         }));
       }
     } catch (error) {
@@ -301,6 +377,157 @@ const UserProfile = () => {
     } finally {
       setFollowLoading(false);
     }
+  };
+
+  const handleToggleFollow = async (userId, userName) => {
+    if (!currentUser || userId === currentUser.id) return;
+
+    const wasFollowing = !!followMap[userId];
+    setActionLoading(userId);
+    setFollowMap(prev => ({ ...prev, [userId]: !wasFollowing }));
+    try {
+      if (wasFollowing) {
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('follows')
+          .insert({ follower_id: currentUser.id, following_id: userId });
+        if (error) throw error;
+        await sendNotification({
+          userId,
+          type: 'follow',
+          message: `${currentUser.name || 'Someone'} started following you`,
+          sourceId: userId,
+          sourceType: 'user',
+          actorId: currentUser.id,
+        });
+      }
+    } catch (error) {
+      console.error('Follow toggle error:', error);
+      setFollowMap(prev => ({ ...prev, [userId]: wasFollowing }));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveConnection = async (userId) => {
+    if (!currentUser || !isOwnProfile) return;
+
+    setActionLoading(userId);
+    try {
+      if (showModal === 'followers') {
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', userId)
+          .eq('following_id', currentUser.id);
+        if (error) throw error;
+        setProfile(prev => ({
+          ...prev,
+          followersList: (prev.followersList || []).filter(f => f.id !== userId),
+        }));
+      } else {
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', userId);
+        if (error) throw error;
+        setProfile(prev => ({
+          ...prev,
+          followingList: (prev.followingList || []).filter(f => f.id !== userId),
+        }));
+      }
+    } catch (error) {
+      console.error('Remove connection error:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Shared row for the followers/following modal (divider between rows, last row has none)
+  const renderListRow = (u, isLast) => {
+    if (!u?.id) return null;
+    const following = !!followMap[u.id];
+    const rowLoading = actionLoading === u.id;
+    return (
+      <div
+        key={u.id}
+        className={`flex items-center justify-between gap-3 px-4 py-3 min-w-0 transition-colors hover:bg-white/[0.03] ${
+          isLast ? '' : 'border-b border-white/5'
+        }`}
+      >
+        <Link
+          to={`/user/${u.id}`}
+          onClick={() => setShowModal(null)}
+          className="flex items-center gap-3 flex-1 min-w-0"
+        >
+          <div className="relative flex-shrink-0">
+            {u.avatar ? (
+              <img src={u.avatar} alt={u.name} className="w-11 h-11 rounded-full object-cover" />
+            ) : (
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-sm font-bold text-white">
+                {u.name && u.name[0] ? u.name[0] : 'U'}
+              </div>
+            )}
+            <OnlineDot userId={u.id} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-white font-semibold truncate">{u.name}</p>
+            <p className="text-xs text-white/40 truncate">@{getUsername(u)}</p>
+          </div>
+        </Link>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setShowModal(null);
+              navigate(`/messages?user=${u.id}`);
+            }}
+            className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
+            title={`Message ${u.name}`}
+          >
+            <MessageCircle className="w-4 h-4" />
+          </button>
+          {u.id !== currentUser?.id &&
+            (isOwnProfile ? (
+              <button
+                type="button"
+                onClick={() => handleRemoveConnection(u.id)}
+                disabled={rowLoading}
+                className="rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50 flex-shrink-0"
+              >
+                {rowLoading ? 'Removing...' : 'Remove'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleToggleFollow(u.id, u.name)}
+                disabled={rowLoading}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50 flex-shrink-0 ${
+                  following
+                    ? 'border border-white/20 text-white/80 hover:bg-white/10'
+                    : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/20 hover:opacity-90'
+                }`}
+              >
+                {rowLoading ? '...' : following ? 'Unfollow' : 'Follow'}
+              </button>
+            ))}
+        </div>
+      </div>
+    );
+  };
+
+  const getUsername = (user) => {
+    if (!user) return '';
+    const fromEmail = user.email?.split('@')[0];
+    if (fromEmail) return fromEmail;
+    return (user.name || 'user').toLowerCase().replace(/[^a-z0-9]/g, '');
   };
 
   const formatDate = (dateString) => {
@@ -492,7 +719,7 @@ const UserProfile = () => {
                   >
                     {profile.name && profile.name[0] ? profile.name[0] : 'U'}
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-primary border-4 border-[#0F0A1E]" />
+                  <OnlineDot userId={profile.id} size="w-5 h-5" borderClass="border-[#0F0A1E]" />
                 </div>
 
                 {/* Info */}
@@ -602,14 +829,14 @@ const UserProfile = () => {
                   onClick={() => setShowModal('following')}
                   className="text-center bg-[#3B82F6]/08 border border-[#3B82F6]/15 rounded-3xl py-3 transition-colors hover:bg-[#3B82F6]/12 shadow-inner shadow-black/10"
                 >
-                  <div className="text-2xl font-bold gradient-text">{profile.followingCount || 0}</div>
+                  <div className="text-2xl font-bold gradient-text">{(profile.followingList?.length) || 0}</div>
                   <div className="text-xs text-white/50">Following</div>
                 </button>
                 <button 
                   onClick={() => setShowModal('followers')}
                   className="text-center bg-[#3B82F6]/08 border border-[#3B82F6]/15 rounded-3xl py-3 transition-colors hover:bg-[#3B82F6]/12 shadow-inner shadow-black/10"
                 >
-                  <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
+                  <div className="text-2xl font-bold gradient-text">{(profile.followersList?.length) || 0}</div>
                   <div className="text-xs text-white/50">Followers</div>
                 </button>
                 <button
@@ -803,85 +1030,29 @@ const UserProfile = () => {
               </div>
 
               {/* Modal Content */}
-              <div className="overflow-y-auto p-4 space-y-3">
+              <div className="overflow-y-auto">
                 {showModal === 'followers' && profile.followersList && profile.followersList.length > 0 ? (
-                  profile.followersList.map((follower) => (
-                    <div
-                      key={follower.id}
-                      className="flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors min-w-0"
-                    >
-                      <Link
-                        to={`/user/${follower.id}`}
-                        onClick={() => setShowModal(null)}
-                        className="flex items-center gap-3 flex-1 min-w-0"
-                      >
-                        {follower.avatar ? (
-                          <img
-                            src={follower.avatar}
-                            alt={follower.name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-sm font-bold text-white">
-                            {follower.name && follower.name[0] ? follower.name[0] : 'U'}
-                          </div>
-                        )}
-                        <span className="text-white/80 font-medium truncate">{follower.name}</span>
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowModal(null);
-                          navigate(`/messages?user=${follower.id}`);
-                        }}
-                        className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
-                        title={`Message ${follower.name}`}
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))
+                  profile.followersList.map((u, idx) =>
+                    renderListRow(u, idx === profile.followersList.length - 1)
+                  )
                 ) : showModal === 'following' && profile.followingList && profile.followingList.length > 0 ? (
-                  profile.followingList.map((following) => (
-                    <div
-                      key={following.id}
-                      className="flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors min-w-0"
-                    >
-                      <Link
-                        to={`/user/${following.id}`}
-                        onClick={() => setShowModal(null)}
-                        className="flex items-center gap-3 flex-1 min-w-0"
-                      >
-                        {following.avatar ? (
-                          <img
-                            src={following.avatar}
-                            alt={following.name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-sm font-bold text-white">
-                            {following.name && following.name[0] ? following.name[0] : 'U'}
-                          </div>
-                        )}
-                        <span className="text-white/80 font-medium truncate">{following.name}</span>
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowModal(null);
-                          navigate(`/messages?user=${following.id}`);
-                        }}
-                        className="p-2 rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all"
-                        title={`Message ${following.name}`}
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))
+                  profile.followingList.map((u, idx) =>
+                    renderListRow(u, idx === profile.followingList.length - 1)
+                  )
                 ) : (
-                  <p className="text-center text-white/40 py-8">
-                    {showModal === 'following' ? 'Not following anyone yet' : 'No followers yet'}
-                  </p>
+                  <div className="px-4 py-10 text-center">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-3">
+                      <Users className="w-5 h-5 text-primary-400" />
+                    </div>
+                    <p className="text-sm text-white/50 font-medium">
+                      {showModal === 'following' ? 'Not following anyone yet' : 'No followers yet'}
+                    </p>
+                    <p className="text-xs text-white/30 mt-1">
+                      {showModal === 'following'
+                        ? 'When this user follows people, they will appear here.'
+                        : 'When someone follows this user, they will appear here.'}
+                    </p>
+                  </div>
                 )}
               </div>
             </motion.div>

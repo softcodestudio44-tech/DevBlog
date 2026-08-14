@@ -86,18 +86,20 @@ BEGIN
     NULLIF(NEW.raw_user_meta_data->>'picture', '')
   );
 
-  INSERT INTO public.profiles (id, email, name, avatar, role)
+  INSERT INTO public.profiles (id, email, name, avatar, role, last_seen)
   VALUES (
     NEW.id,
     _email,
     _name,
     _avatar,
-    CASE WHEN _email = 'sofcodestudio44@gmail.com' THEN 'admin' ELSE 'user' END
+    CASE WHEN _email IN ('softcodestudio44@gmail.com', 'sofcodestudio44@gmail.com') THEN 'admin' ELSE 'user' END,
+    now()
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     name = EXCLUDED.name,
-    avatar = COALESCE(public.profiles.avatar, EXCLUDED.avatar);
+    avatar = COALESCE(public.profiles.avatar, EXCLUDED.avatar),
+    role = CASE WHEN public.profiles.role = 'admin' THEN 'admin' ELSE EXCLUDED.role END;
   RETURN NEW;
 END;
 $$;

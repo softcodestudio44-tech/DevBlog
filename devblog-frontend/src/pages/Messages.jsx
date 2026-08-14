@@ -6,11 +6,18 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import ConfirmDialog from '../components/ConfirmDialog';
+import OnlineDot from '../components/OnlineDot';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useDirectMessages } from '../hooks/useDirectMessages';
+import { isAdminUser } from '../lib/admin';
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const Messages = () => {
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
@@ -22,11 +29,14 @@ const Messages = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [replyTo, setReplyTo] = useState(null);
+  const [menuMsgId, setMenuMsgId] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [busy, setBusy] = useState(false);
   
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
 
-  const isAdmin = user?.email === 'sofcodestudio44@gmail.com' || user?.role === 'admin';
+  const isAdmin = isAdminUser(user);
 
   // Use the DMs hook with the active other user
   const { 
@@ -185,6 +195,7 @@ const Messages = () => {
     if (!targetUser || targetUser.id === user?.id) return;
     setActiveDMUser(targetUser);
     setReplyTo(null);
+    setMenuMsgId(null);
     setShowSidebar(false);
     
     // Mark messages as read when opening a conversation
@@ -203,7 +214,7 @@ const Messages = () => {
     if (!newMessage.trim() || !activeDMUser || !user?.id) return;
     
     if (activeDMUser.id === user.id) {
-      alert("You can't message yourself!");
+      toast({ type: 'notification', title: "Can't message yourself", body: 'Pick a different conversation.' });
       return;
     }
 
@@ -211,27 +222,55 @@ const Messages = () => {
       ? `> ${replyTo.content}\n\n${newMessage.trim()}`
       : newMessage.trim();
 
-    await sendDM(content);
+    const res = await sendDM(content);
+    if (res?.error) {
+      toast({ type: 'notification', title: 'Could not send message', body: res.error });
+      return;
+    }
+    if (res?.queued) {
+      toast({ type: 'offline', title: 'Message queued', body: "You're offline — it will send when you're back online." });
+    }
     setNewMessage('');
     setReplyTo(null);
     if (inputRef.current) inputRef.current.focus();
   };
 
   const handleReplyToMessage = (message) => {
+    setMenuMsgId(null);
     setReplyTo({ id: message.id, authorName: message.sender?.name || 'Message', content: message.content });
     if (inputRef.current) inputRef.current.focus();
   };
 
   const clearReply = () => setReplyTo(null);
 
-  const handleDeleteMessage = async (messageId) => {
-    if (!messageId) return;
-    if (!window.confirm('Delete this message?')) return;
-    try {
-      await deleteDM(messageId);
-    } catch (err) {
-      console.error('Delete message failed:', err);
+  const askDeleteMessage = (message, mode) => {
+    setMenuMsgId(null);
+    setConfirm({
+      messageId: message.id,
+      mode,
+      title: mode === 'everyone' ? 'Delete message for everyone?' : 'Delete message for me?',
+      message: mode === 'everyone'
+        ? 'This will remove the message for both of you.'
+        : 'This will only hide the message from your view.',
+      confirmLabel: 'Delete',
+    });
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!confirm?.messageId) return;
+    setBusy(true);
+    const ok = await deleteDM(confirm.messageId, { mode: confirm.mode || 'everyone' });
+    setBusy(false);
+    if (ok) {
+      toast({
+        type: 'success',
+        title: 'Message deleted',
+        body: confirm.mode === 'me' ? 'Hidden from your view.' : 'Removed for both of you.',
+      });
+    } else {
+      toast({ type: 'notification', title: 'Delete failed', body: 'Could not delete the message.' });
     }
+    setConfirm(null);
   };
 
   const formatTime = (dateStr) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -328,6 +367,7 @@ const Messages = () => {
                               </div>
                             )}
                           </div>
+                          <OnlineDot userId={u.id} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="text-sm font-medium truncate text-white/90">{u.name}</span>
@@ -378,23 +418,19 @@ const Messages = () => {
             </button>
             <Link to={`/user/${activeDMUser.id}`} className="relative hover:opacity-80">
               {activeDMUser.avatar ? (
-                <img src={activeDMUser.avatar} alt={activeDMUser.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20/20" />
+                <img src={activeDMUser.avatar} alt={activeDMUser.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-700 to-primary-800 flex items-center justify-center text-sm font-bold text-white">
                   {activeDMUser.name?.[0]}
                 </div>
               )}
+              <OnlineDot userId={activeDMUser.id} borderClass="border-[#0d0f16]" />
             </Link>
             <div className="min-w-0 flex-1">
               <Link to={`/user/${activeDMUser.id}`} className="font-semibold text-white text-sm hover:text-primary-300 block truncate">
                 {activeDMUser.name}
               </Link>
               <p className="text-xs text-primary-400/50">Direct message</p>
-            </div>
-            <div className="flex items-center gap-1">
-              <button className="p-2 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
-                <MoreVertical className="w-4 h-4" />
-              </button>
             </div>
           </div>
         )}
@@ -441,11 +477,22 @@ const Messages = () => {
               const isOwn = msg.sender_id === user?.id;
               const prevMsg = dmMessages[idx - 1];
               const nextMsg = dmMessages[idx + 1];
+              const isDeleted = !!msg.deleted_at;
+              const withinHour = (Date.now() - new Date(msg.created_at).getTime()) <= ONE_HOUR_MS;
               const showTime = !nextMsg || nextMsg.sender_id !== msg.sender_id ||
                 (new Date(nextMsg.created_at) - new Date(msg.created_at)) > 300000;
               const isFirstInGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
-              const canDelete = isOwn || isAdmin;
               const author = msg.sender || (msg.sender_id === user?.id ? { name: user.name, avatar: user.avatar } : { name: activeDMUser?.name, avatar: activeDMUser?.avatar });
+
+              const menuOptions = [];
+              if (isDeleted) {
+                // no actions on a deleted message
+              } else if (isOwn) {
+                if (withinHour) menuOptions.push({ label: 'Delete for everyone', type: 'everyone' });
+                menuOptions.push({ label: 'Delete for me', type: 'me' });
+              } else if (isAdmin) {
+                menuOptions.push({ label: 'Delete message', type: 'everyone' });
+              }
 
               return (
                 <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-3' : 'mt-0.5'}`}>
@@ -464,24 +511,57 @@ const Messages = () => {
                     {!isFirstInGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
 
                     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} relative group`}>
-                      <div className={`px-4 py-2 rounded-3xl ${
-                        isOwn
-                          ? 'bg-[#3d2460] text-white rounded-tr-sm'
-                          : 'bg-[#1a1d27] text-white/90 rounded-tl-sm border border-white/10 shadow-sm shadow-black/10'
-                      }`}>
-                        <MarkdownRenderer content={msg.content} />
-                      </div>
-                      <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
-                          <CornerUpLeft className="w-4 h-4" />
-                        </button>
-                        {canDelete && (
-                          <button onClick={() => handleDeleteMessage(msg.id)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      {showTime && (
+                      {isDeleted ? (
+                        <div className="px-4 py-2 rounded-3xl bg-white/[0.04] text-white/30 italic text-sm border border-white/5">
+                          This message was deleted
+                        </div>
+                      ) : (
+                        <>
+                          <div className={`px-4 py-2 rounded-3xl ${
+                            isOwn
+                              ? 'bg-[#3d2460] text-white rounded-tr-sm'
+                              : 'bg-[#1a1d27] text-white/90 rounded-tl-sm border border-white/10 shadow-sm shadow-black/10'
+                          }`}>
+                            <MarkdownRenderer content={msg.content} />
+                          </div>
+                          <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleReplyToMessage(msg)} type="button" className="p-1 rounded-full hover:bg-white/10 text-white/50" aria-label="Reply">
+                              <CornerUpLeft className="w-4 h-4" />
+                            </button>
+                            {menuOptions.length > 0 && (
+                              <div className="relative">
+                                <button
+                                  onClick={() => setMenuMsgId(menuMsgId === msg.id ? null : msg.id)}
+                                  type="button"
+                                  className="p-1 rounded-full hover:bg-white/10 text-white/50"
+                                  aria-label="Message options"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                                {menuMsgId === msg.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setMenuMsgId(null)} />
+                                    <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl glass-strong shadow-xl shadow-black/40 p-1.5">
+                                      {menuOptions.map((opt) => (
+                                        <button
+                                          key={opt.type}
+                                          type="button"
+                                          onClick={() => askDeleteMessage(msg, opt.type)}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-300/90 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 text-red-400/70" />
+                                          {opt.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                      {showTime && !isDeleted && (
                         <span className={`text-[10px] text-white/30 mt-1 ${isOwn ? 'mr-1' : 'ml-1'}`}>
                           {formatTime(msg.created_at)}
                         </span>
@@ -540,6 +620,17 @@ const Messages = () => {
           </div>
         )}
       </div>
+
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel || 'Delete'}
+        loading={busy}
+        onCancel={() => { if (!busy) setConfirm(null); }}
+        onConfirm={() => confirmDeleteMessage()}
+      />
     </div>
   );
 };

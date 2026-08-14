@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import LikeButton from '../components/LikeButton';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import FloatingBettyAI from '../components/FloatingBettyAI';
+import OnlineDot from '../components/OnlineDot';
 
 const CATEGORIES = [
   { name: 'All', tag: 'tag-blue' },
@@ -352,7 +354,7 @@ const Home = () => {
                   <div className="flex items-center gap-3 mb-3">
                     <Link
                       to={`/user/${post.author_id}`}
-                      className="hover:opacity-80 transition-opacity flex-shrink-0"
+                      className="hover:opacity-80 transition-opacity flex-shrink-0 relative"
                       onTouchEnd={(e) => e.stopPropagation()}
                     >
                       {post.author?.avatar ? (
@@ -366,6 +368,7 @@ const Home = () => {
                           {post.author?.name?.[0] || 'U'}
                         </div>
                       )}
+                      <OnlineDot userId={post.author_id} />
                     </Link>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -467,6 +470,8 @@ const Home = () => {
           )}
         </div>
       )}
+
+      <FloatingBettyAI />
     </div>
   );
 };

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
-  Home, Users, MessageCircle, Sparkles, Shield
+  Home, Users, MessageCircle, Shield
 } from 'lucide-react';
+import { isAdminUser } from '../lib/admin';
 import NotificationBell from './NotificationBell';
 import ProfileMenu from './ProfileMenu';
 import Logo from './Logo';
@@ -24,11 +25,10 @@ const Navbar = () => {
     { to: '/', icon: Home, label: 'Feed' },
     { to: '/community', icon: Users, label: 'Community' },
     { to: '/messages', icon: MessageCircle, label: 'Messages' },
-    { to: '/betty-ai', icon: Sparkles, label: 'Betty AI' },
   ];
 
   const isActive = (path) => location.pathname === path;
-  const isAdmin = user?.email === 'sofcodestudio44@gmail.com' || user?.role === 'admin';
+  const isAdmin = isAdminUser(user);
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 h-16 bg-[#0d0f16] border-b border-white/[0.06] transition-shadow duration-300 ${scrolled ? 'shadow-lg shadow-black/25' : ''}`}>

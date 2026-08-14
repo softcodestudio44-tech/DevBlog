@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
+import { OnlineStatusProvider } from './context/OnlineStatusContext';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import AnimatedBackground from './components/AnimatedBackground';
@@ -107,11 +108,13 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ToastProvider>
-          <Router>
-            <AppContent />
-          </Router>
-        </ToastProvider>
+        <OnlineStatusProvider>
+          <ToastProvider>
+            <Router>
+              <AppContent />
+            </Router>
+          </ToastProvider>
+        </OnlineStatusProvider>
       </AuthProvider>
     </ThemeProvider>
   );
