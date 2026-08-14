@@ -110,7 +110,102 @@ const Ribbons = () => (
   </div>
 );
 
-const AnimatedBackground = () => {
+const T = (text, cls) => ({ text, cls });
+
+const CODE_WINDOWS = [
+  {
+    title: 'App.jsx',
+    lines: [
+      [T('import', 'tok-purple'), T(' React ', 'tok-muted'), T('from', 'tok-purple'), T(" 'react'", 'tok-green')],
+      [T('function', 'tok-purple'), T(' App', 'tok-cyan'), T('() {', 'tok-muted')],
+      [T('  return ', 'tok-muted'), T('<div>', 'tok-orange'), T('Hello', 'tok-muted'), T('</div>', 'tok-orange')],
+      [T('}', 'tok-muted'), T('export default ', 'tok-purple'), T('App', 'tok-cyan')],
+    ],
+    style: { left: '3%', top: '16%', width: 330, '--wr': '-3deg' },
+    dur: 18,
+    delay: 0,
+    sm: true,
+  },
+  {
+    title: 'api.ts',
+    lines: [
+      [T('const ', 'tok-purple'), T('[count, setCount]', 'tok-cyan'), T(' = ', 'tok-muted'), T('useState', 'tok-cyan'), T('(0)', 'tok-muted')],
+      [T('await ', 'tok-purple'), T('supabase', 'tok-cyan')],
+      [T('  ', 'tok-muted'), T('.from', 'tok-cyan'), T("('posts')", 'tok-green')],
+      [T('  ', 'tok-muted'), T('.select', 'tok-cyan'), T("('*')", 'tok-green')],
+    ],
+    style: { right: '4%', top: '9%', width: 360, '--wr': '2deg' },
+    dur: 22,
+    delay: 1,
+    sm: false,
+  },
+  {
+    title: 'terminal',
+    lines: [
+      [T('$ ', 'tok-orange'), T('npm run dev', 'tok-green')],
+      [T('VITE v6.4.3 ready in 350ms', 'tok-muted')],
+      [T('  Local: ', 'tok-muted'), T('http://localhost:5173/', 'tok-cyan')],
+    ],
+    style: { left: '1%', top: '50%', width: 300, '--wr': '3deg' },
+    dur: 20,
+    delay: 2,
+    sm: true,
+  },
+  {
+    title: 'git',
+    lines: [
+      [T('$ ', 'tok-orange'), T('git commit -m ', 'tok-green'), T('"initial"', 'tok-green')],
+      [T('[main 4cd6afd] initial', 'tok-muted')],
+      [T(' 1 file changed, 122 insertions(+)', 'tok-muted')],
+    ],
+    style: { right: '3%', top: '44%', width: 320, '--wr': '-2deg' },
+    dur: 24,
+    delay: 0.5,
+    sm: false,
+  },
+  {
+    title: 'PostCard.jsx',
+    lines: [
+      [T('export default function ', 'tok-purple'), T('PostCard', 'tok-cyan'), T('() {', 'tok-muted')],
+      [T('  return (', 'tok-muted')],
+      [T('    ', 'tok-muted'), T('<div ', 'tok-orange'), T('className', 'tok-cyan'), T('=', 'tok-muted'), T('"container"', 'tok-green'), T('>', 'tok-orange')],
+    ],
+    style: { left: '10%', bottom: '6%', width: 320, '--wr': '1deg' },
+    dur: 19,
+    delay: 1.5,
+    sm: false,
+  },
+];
+
+const CodeWindows = () => (
+  <div className="code-windows-layer" aria-hidden="true">
+    {CODE_WINDOWS.map((w) => (
+      <div
+        key={w.title}
+        className={`code-window ${w.sm ? '' : 'hide-sm'}`}
+        style={{ ...w.style, animationDuration: `${w.dur}s`, animationDelay: `${w.delay}s` }}
+      >
+        <div className="code-window-bar">
+          <span className="code-dot code-dot-red" />
+          <span className="code-dot code-dot-yellow" />
+          <span className="code-dot code-dot-green" />
+          <span className="code-window-title">{w.title}</span>
+        </div>
+        <div className="code-window-body">
+          {w.lines.map((line, i) => (
+            <div key={i} className="code-line">
+              {line.map((tok, j) => (
+                <span key={j} className={tok.cls}>{tok.text}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const AnimatedBackground = ({ isLanding = false }) => {
   const { pathname } = useLocation();
   const isAuth = ['/login', '/register', '/forgot-password'].includes(pathname);
   // Profile pages get a clean background so no code text sits behind the cards
@@ -122,6 +217,13 @@ const AnimatedBackground = () => {
         <>
           <div className="auth-base" />
           <Ribbons />
+          <div className="bg-vignette" />
+        </>
+      ) : isLanding ? (
+        <>
+          <div className="auth-base" />
+          <Ribbons />
+          <CodeWindows />
           <div className="bg-vignette" />
         </>
       ) : isProfile ? (
