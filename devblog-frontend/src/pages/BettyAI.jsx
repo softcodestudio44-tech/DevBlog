@@ -317,8 +317,8 @@ const BettyAI = () => {
     setMenuOpen(false);
     setConfirmAction({
       type: 'clear',
-      title: 'Clear chat',
-      message: 'Remove all messages from this screen? Your saved history will be kept.',
+      title: 'Clear conversation',
+      message: 'Clear this conversation?',
       confirmLabel: 'Clear',
     });
   };
@@ -365,7 +365,7 @@ const BettyAI = () => {
         setTechStack([]);
         setMessages([WELCOME_MESSAGE]);
         setConfirmAction(null);
-        toast({ type: 'success', title: 'History deleted', body: 'All Betty AI history was permanently removed.' });
+        toast({ type: 'success', title: 'History deleted', body: 'Chat history deleted' });
       } catch (err) {
         console.error('Error deleting Betty AI history:', err);
         toast({ type: 'notification', title: 'Delete failed', body: 'Could not delete history. Try again.' });
@@ -446,8 +446,7 @@ const BettyAI = () => {
           <div ref={menuRef} className="relative flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={clearChat}
-              disabled={loading}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.03] text-white/40 hover:text-violet-300/80 transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.03] text-white/40 hover:text-violet-300/80 transition-all"
               title="Clear chat"
             >
               <Trash2 className="w-4 h-4" />
@@ -481,8 +480,7 @@ const BettyAI = () => {
                     </button>
                     <button
                       onClick={deleteHistory}
-                      disabled={loading}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-all"
                     >
                       <Trash2 className="w-4 h-4 text-red-400/80" />
                       Delete history
