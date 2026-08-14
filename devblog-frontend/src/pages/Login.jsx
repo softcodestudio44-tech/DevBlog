@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import SEO from '../components/SEO';
 import Logo from '../components/Logo';
-import WhatsAppIcon from '../components/WhatsAppIcon';
 
 const GoogleIcon = ({ className }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -160,16 +159,6 @@ const Login = () => {
             </Link>
           </p>
         </div>
-
-        <a
-          href="https://wa.me/2348056244696"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 inline-flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors"
-        >
-          <WhatsAppIcon className="w-4 h-4" />
-          Need help? Contact us on WhatsApp
-        </a>
       </div>
     </>
   );

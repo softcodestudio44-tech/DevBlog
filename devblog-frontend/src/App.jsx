@@ -10,6 +10,7 @@ import AnimatedBackground from './components/AnimatedBackground';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
 import LoadingScreen from './components/LoadingScreen';
+import FloatingSupport from './components/FloatingSupport';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './context/ToastContext';
@@ -57,6 +58,7 @@ function AppContent() {
   const isAuthPage = PUBLIC_PATHS.includes(location.pathname);
   const isLanding = location.pathname === '/' && !isAuthenticated;
   const showNav = !isAuthPage && !isLanding;
+  const showSupport = isLanding || location.pathname === '/login' || location.pathname === '/register';
 
   const mainClass = showNav
     ? 'flex-1 flex flex-col min-w-0 pt-16 pb-[calc(60px+env(safe-area-inset-bottom))] lg:pb-0'
@@ -64,7 +66,7 @@ function AppContent() {
 
   return (
     <>
-      <AnimatedBackground />
+      <AnimatedBackground isLanding={isLanding} />
       <div className="min-h-screen flex flex-col relative z-10">
         {showNav && <Navbar />}
 
@@ -93,6 +95,7 @@ function AppContent() {
 
         {showNav && <BottomNav />}
       </div>
+      {showSupport && <FloatingSupport />}
       <OfflineBanner />
       <InstallPrompt />
       <AnimatePresence>{showLoader && <LoadingScreen />}</AnimatePresence>
