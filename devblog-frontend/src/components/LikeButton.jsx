@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sendNotification } from '../lib/notify';
+import { isOnline, enqueueAction } from '../lib/offline';
 
 const LikeButton = ({ postId, authorId, initialCount = 0 }) => {
   const { user, isAuthenticated } = useAuth();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
+  const handleLikeRef = useRef(null);
 
   useEffect(() => {
     setCount(initialCount);
@@ -86,6 +88,17 @@ const LikeButton = ({ postId, authorId, initialCount = 0 }) => {
     }
   };
 
+  // Listen for double-tap like events dispatched from the feed
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.postId === postId) {
+        handleLikeRef.current?.(e);
+      }
+    };
+    window.addEventListener('devblog:like', handler);
+    return () => window.removeEventListener('devblog:like', handler);
+  }, [postId]);
+
   const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -103,6 +116,13 @@ const LikeButton = ({ postId, authorId, initialCount = 0 }) => {
     const newCount = newLiked ? count + 1 : Math.max(0, count - 1);
     setLiked(newLiked);
     setCount(newCount);
+
+    // Offline: queue the like for later sync
+    if (!isOnline()) {
+      enqueueAction({ type: 'like', payload: { post_id: postId, user_id: user.id } });
+      setLoading(false);
+      return;
+    }
 
     try {
       if (newLiked) {
@@ -137,6 +157,8 @@ const LikeButton = ({ postId, authorId, initialCount = 0 }) => {
       setLoading(false);
     }
   };
+
+  handleLikeRef.current = handleLike;
 
   return (
     <motion.button

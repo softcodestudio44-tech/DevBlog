@@ -1,23 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield } from 'lucide-react';
+import { ArrowLeft, PenLine, Heart, MessageCircle, Edit3, Calendar, Github, Twitter, Linkedin, Globe, Music2, Facebook, ExternalLink, UserPlus, UserCheck, X, Shield, MapPin, Camera, Save, Loader2, Activity as ActivityIcon, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import GlassCard from '../components/GlassCard';
 import { sendNotification } from '../lib/notify';
+import { uploadCover, uploadAvatar } from '../lib/storage';
 
 const UserProfile = () => {
   const { id } = useParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, updateProfile } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const [showModal, setShowModal] = useState(null); // 'followers' or 'following' or null
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const avatarInputRef = useRef(null);
+  const coverInputRef = useRef(null);
 
   const isOwnProfile = currentUser && currentUser.id === id;
+
+  // Scroll to a section
+  const scrollToSection = (sectionId) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   useEffect(() => {
     fetchProfileData();
@@ -159,6 +175,56 @@ const UserProfile = () => {
         .eq('follower_id', id)
         .limit(10);
 
+      // Activity feed: recent likes, comments on posts, and new followers
+      const [{ data: likesData }, { data: commentsData }, { data: newFollowers }] = await Promise.all([
+        supabase
+          .from('likes')
+          .select('*, user:profiles!likes_user_id_fkey(id, name, avatar), post:posts!likes_post_id_fkey(id, title)')
+          .filter('post.author_id', 'eq', id)
+          .order('created_at', { ascending: false })
+          .limit(8),
+        supabase
+          .from('comments')
+          .select('*, author:profiles!comments_author_id_fkey(id, name, avatar), post:posts!comments_post_id_fkey(id, title)')
+          .filter('post.author_id', 'eq', id)
+          .order('created_at', { ascending: false })
+          .limit(8),
+        supabase
+          .from('follows')
+          .select('follower:profiles!follows_follower_id_fkey(id, name, avatar), created_at')
+          .eq('following_id', id)
+          .order('created_at', { ascending: false })
+          .limit(8),
+      ]);
+
+      const items = [
+        ...(likesData || []).map((l) => ({
+          id: `like-${l.id}`,
+          type: 'like',
+          actor: l.user,
+          target: l.post?.title || 'your post',
+          postId: l.post?.id,
+          createdAt: l.created_at,
+        })),
+        ...(commentsData || []).map((c) => ({
+          id: `comment-${c.id}`,
+          type: 'comment',
+          actor: c.author,
+          target: c.post?.title || 'your post',
+          postId: c.post?.id,
+          snippet: c.content,
+          createdAt: c.created_at,
+        })),
+        ...(newFollowers || []).map((f) => ({
+          id: `follow-${f.follower?.id}-${f.created_at}`,
+          type: 'follow',
+          actor: f.follower,
+          createdAt: f.created_at,
+        })),
+      ]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 15);
+
       const transformedPosts = (postsData || []).map(post => ({
         ...post,
         likeCount: post.likes?.[0]?.count || 0,
@@ -178,6 +244,7 @@ const UserProfile = () => {
         followingList: (followingData || []).map(f => f.following),
       });
       setPosts(transformedPosts);
+      setActivity(items);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -236,6 +303,84 @@ const UserProfile = () => {
       month: 'long',
       year: 'numeric',
     });
+  };
+
+  const openEditModal = () => {
+    if (!profile) return;
+    setEditForm({
+      name: profile.name || '',
+      bio: profile.bio || '',
+      location: profile.location || '',
+      avatar: profile.avatar || '',
+      cover_url: profile.cover_url || '',
+      github: profile.github || '',
+      twitter: profile.twitter || '',
+      linkedin: profile.linkedin || '',
+      website: profile.website || '',
+      tiktok: profile.tiktok || '',
+      facebook: profile.facebook || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !currentUser?.id) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ type: 'notification', title: 'Invalid file', body: 'Please choose an image.' });
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const url = await uploadAvatar(currentUser.id, file);
+      setEditForm((prev) => ({ ...prev, avatar: url }));
+      toast({ type: 'success', title: 'Avatar updated', body: 'Remember to save your changes.' });
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      toast({ type: 'notification', title: 'Upload failed', body: 'Could not upload avatar.' });
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !currentUser?.id) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ type: 'notification', title: 'Invalid file', body: 'Please choose an image.' });
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const url = await uploadCover(currentUser.id, file);
+      setEditForm((prev) => ({ ...prev, cover_url: url }));
+      toast({ type: 'success', title: 'Cover updated', body: 'Remember to save your changes.' });
+    } catch (err) {
+      console.error('Cover upload error:', err);
+      toast({ type: 'notification', title: 'Upload failed', body: 'Could not upload cover.' });
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await updateProfile(editForm);
+      if (error) throw new Error(error);
+      setProfile((prev) => ({ ...prev, ...editForm }));
+      setShowEditModal(false);
+      toast({ type: 'success', title: 'Profile updated', body: 'Your changes were saved.' });
+    } catch (err) {
+      console.error('Profile update error:', err);
+      toast({ type: 'notification', title: 'Update failed', body: err.message || 'Could not save changes.' });
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const getSocialLink = (url, type) => {
@@ -302,7 +447,24 @@ const UserProfile = () => {
           {/* Profile Header */}
           <GlassCard className="glass-strong mb-8 relative overflow-hidden profile-panel">
             <div className="profile-accent-ring" />
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-[#3B82F6]/25 to-transparent" />
+            {/* Cover photo */}
+            {profile.cover_url ? (
+              <div className="absolute top-0 left-0 right-0 h-32 sm:h-40 overflow-hidden">
+                <img
+                  src={profile.cover_url}
+                  alt="Profile cover"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0F0A1E]/60" />
+                <div className="hidden absolute inset-0 bg-gradient-to-r from-[#3B82F6]/25 to-transparent items-center justify-center" />
+              </div>
+            ) : (
+              <div className="absolute top-0 left-0 right-0 h-32 sm:h-40 bg-gradient-to-r from-[#3B82F6]/25 to-transparent" />
+            )}
 
             <div className="relative pt-16 px-4 pb-6">
               <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
@@ -341,12 +503,13 @@ const UserProfile = () => {
                     )}
 
                     {isOwnProfile && (
-                      <Link
-                        to="/edit-profile"
+                      <button
+                        onClick={openEditModal}
                         className="p-2 rounded-xl glass hover:bg-primary/20 transition-colors"
+                        title="Edit profile"
                       >
                         <Edit3 className="w-4 h-4 text-primary-300" />
-                      </Link>
+                      </button>
                     )}
                   </div>
 
@@ -413,6 +576,12 @@ const UserProfile = () => {
                   )}
 
                   <div className="flex flex-wrap gap-4 text-sm text-white/40">
+                    {profile.location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        {profile.location}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       Joined {formatDate(profile.createdAt)}
@@ -437,20 +606,103 @@ const UserProfile = () => {
                   <div className="text-2xl font-bold gradient-text">{profile.followersCount || 0}</div>
                   <div className="text-xs text-white/50">Followers</div>
                 </button>
-                <div className="text-center bg-white/5 border border-white/10 rounded-3xl py-4 shadow-inner shadow-black/10">
+                <button
+                  onClick={() => scrollToSection('activity-feed')}
+                  className="text-center bg-[#3B82F6]/08 border border-[#3B82F6]/15 rounded-3xl py-3 transition-colors hover:bg-[#3B82F6]/12 shadow-inner shadow-black/10"
+                >
                   <div className="text-2xl font-bold gradient-text">{profile.likeCount || 0}</div>
                   <div className="text-xs text-white/50">Likes</div>
-                </div>
-                <div className="text-center bg-white/5 border border-white/10 rounded-3xl py-4 shadow-inner shadow-black/10">
+                </button>
+                <button
+                  onClick={() => scrollToSection('user-posts')}
+                  className="text-center bg-[#3B82F6]/08 border border-[#3B82F6]/15 rounded-3xl py-3 transition-colors hover:bg-[#3B82F6]/12 shadow-inner shadow-black/10"
+                >
                   <div className="text-2xl font-bold gradient-text">{profile.postCount || 0}</div>
                   <div className="text-xs text-white/50">Posts</div>
-                </div>
+                </button>
               </div>
             </div>
           </GlassCard>
 
+          {/* Activity Feed */}
+          <div id="activity-feed" className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <ActivityIcon className="w-5 h-5 text-primary-300" />
+              Activity
+            </h2>
+            {activity.length === 0 ? (
+              <GlassCard className="text-center py-8">
+                <p className="text-white/40 text-sm">No recent activity</p>
+              </GlassCard>
+            ) : (
+              <div className="space-y-3">
+                {activity.map((item) => (
+                  <GlassCard key={item.id}>
+                    <div className="flex items-start gap-3">
+                      {item.actor?.avatar ? (
+                        <img
+                          src={item.actor.avatar}
+                          alt={item.actor.name}
+                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+                          {item.actor?.name?.[0] || 'U'}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-white/75 leading-relaxed">
+                          {item.type === 'like' && (
+                            <>
+                              <Link to={`/user/${item.actor?.id}`} className="font-semibold text-white hover:text-primary-300">
+                                {item.actor?.name || 'Someone'}
+                              </Link>{' '}
+                              <Heart className="w-3.5 h-3.5 inline-block text-pink-400 -mt-0.5" /> liked{' '}
+                              {item.target && (
+                                <Link to={`/post/${item.postId || ''}`} className="text-primary-300 hover:underline">
+                                  {item.target}
+                                </Link>
+                              )}
+                            </>
+                          )}
+                          {item.type === 'comment' && (
+                            <>
+                              <Link to={`/user/${item.actor?.id}`} className="font-semibold text-white hover:text-primary-300">
+                                {item.actor?.name || 'Someone'}
+                              </Link>{' '}
+                              commented on {item.target && <span className="text-primary-300">{item.target}</span>}
+                              {item.snippet && (
+                                <span className="block text-white/40 text-xs mt-1 line-clamp-2">{item.snippet}</span>
+                              )}
+                            </>
+                          )}
+                          {item.type === 'follow' && (
+                            <>
+                              <Link to={`/user/${item.actor?.id}`} className="font-semibold text-white hover:text-primary-300">
+                                {item.actor?.name || 'Someone'}
+                              </Link>{' '}
+                              started following you
+                            </>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-white/30 mt-1">
+                          {new Date(item.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* User's Posts */}
-          <div className="flex items-center justify-between mb-6">
+          <div id="user-posts" className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold">Posts by {profile.name}</h2>
             {isOwnProfile && (
               <Link to="/create" className="btn-neon text-sm flex items-center gap-2">
@@ -617,6 +869,198 @@ const UserProfile = () => {
                 )}
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Profile Modal */}
+      <AnimatePresence>
+        {showEditModal && editForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowEditModal(false)}
+          >
+            <motion.form
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-strong w-full max-w-md max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={handleEditSubmit}
+            >
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <h3 className="text-lg font-semibold">Edit Profile</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5 text-white/60" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-4 space-y-4">
+                {/* Cover preview */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/70">Cover Photo</label>
+                  <div className="relative h-24 rounded-xl overflow-hidden bg-gradient-to-r from-[#3B82F6]/25 to-transparent">
+                    {editForm.cover_url ? (
+                      <img src={editForm.cover_url} alt="Cover" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-r from-[#3B82F6]/25 to-transparent" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      disabled={uploadingCover}
+                      className="absolute bottom-2 right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-strong text-xs font-medium text-white/80 hover:bg-white/10 transition-all disabled:opacity-50"
+                    >
+                      {uploadingCover ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="w-3.5 h-3.5" />
+                      )}
+                      {editForm.cover_url ? 'Change' : 'Upload'}
+                    </button>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoverUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+
+                {/* Avatar */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/70">Avatar</label>
+                  <div className="flex items-center gap-4">
+                    {editForm.avatar ? (
+                      <img
+                        src={editForm.avatar}
+                        alt="Avatar"
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-primary-500/30"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-2xl font-bold text-white">
+                        {editForm.name?.[0] || 'U'}
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-xs font-medium text-white/80 hover:bg-white/10 transition-all disabled:opacity-50"
+                      >
+                        {uploadingAvatar ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Camera className="w-3.5 h-3.5" />
+                        )}
+                        Upload photo
+                      </button>
+                      {editForm.avatar && (
+                        <button
+                          type="button"
+                          onClick={() => setEditForm((prev) => ({ ...prev, avatar: '' }))}
+                          className="text-xs text-white/40 hover:text-red-400 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/70">Display Name</label>
+                  <input
+                    type="text"
+                    className="input-glass"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/70">Bio</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Tell us about yourself..."
+                    className="input-glass resize-none"
+                    value={editForm.bio}
+                    onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white/70">Location</label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                    <input
+                      type="text"
+                      placeholder="City, Country"
+                      className="input-glass pl-9"
+                      value={editForm.location}
+                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4">
+                  <h4 className="text-sm font-medium mb-3 text-white/70">Social Links</h4>
+                  <div className="space-y-3">
+                    {[
+                      { key: 'github', label: 'GitHub', placeholder: 'github.com/username' },
+                      { key: 'twitter', label: 'Twitter/X', placeholder: 'twitter.com/username' },
+                      { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/username' },
+                      { key: 'website', label: 'Website', placeholder: 'yourwebsite.com' },
+                      { key: 'tiktok', label: 'TikTok', placeholder: 'tiktok.com/@username' },
+                      { key: 'facebook', label: 'Facebook', placeholder: 'facebook.com/username' },
+                    ].map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <label className="text-xs font-medium mb-1.5 text-white/50 block">{label}</label>
+                        <input
+                          type="text"
+                          className="input-glass"
+                          placeholder={placeholder}
+                          value={editForm[key] || ''}
+                          onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-white/10">
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="btn-neon w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {savingEdit ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save Changes
+                </button>
+              </div>
+            </motion.form>
           </motion.div>
         )}
       </AnimatePresence>

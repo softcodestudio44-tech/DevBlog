@@ -1,7 +1,19 @@
-const CACHE_NAME = 'devblog-v4';
+const CACHE_NAME = 'devblog-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/site.webmanifest',
+  '/android-chrome-192x192.png',
+  '/android-chrome-512x512.png',
+  '/maskable-icon-192x192.png',
+  '/maskable-icon-512x512.png',
+  '/apple-touch-icon.png',
+  '/favicon.ico',
+  '/favicon-16x16.png',
+  '/favicon-32x32.png',
+  '/favicon-64x64.png',
+  '/favicon-128x128.png',
+  '/logo.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -26,37 +38,36 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first strategy for HTML, stale-while-revalidate for assets
-// SKIP caching for POST, PUT, DELETE requests
+// Network-first for HTML, cache-first for assets, offline fallback to app shell
+// Never intercept non-GET requests (POST/PUT/DELETE go straight to the network)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Don't cache non-GET requests at all
   if (request.method !== 'GET') {
     return;
   }
 
-  // For HTML pages - always go to network first
+  // HTML pages - network first, fall back to cache, then to app shell
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Update cache with fresh version
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, clone);
           });
           return response;
         })
-        .catch(() => {
-          // Fallback to cache if network fails
-          return caches.match(request);
-        })
+        .catch(() =>
+          caches.match(request).then(
+            (cached) => cached || caches.match('/index.html')
+          )
+        )
     );
     return;
   }
 
-  // For assets - cache first, then update in background
+  // Everything else - cache first, update in background
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)

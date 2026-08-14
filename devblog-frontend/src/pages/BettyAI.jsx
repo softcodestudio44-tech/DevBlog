@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Code, FileText, Sparkles, Loader2, Copy, Check, Mic, Trash2, GitBranch, Bug } from 'lucide-react';
+import { Send, Code, FileText, Sparkles, Loader2, Copy, Check, Mic, Trash2, GitBranch, Bug, Download, MoreVertical } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const WELCOME_MESSAGE = {
@@ -35,6 +36,7 @@ const detectTechStack = (text = '') => {
 
 const BettyAI = () => {
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
@@ -45,9 +47,20 @@ const BettyAI = () => {
   const [copiedId, setCopiedId] = useState(null);
   const [techStack, setTechStack] = useState([]);
   const [slowWarning, setSlowWarning] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const slowTimerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Close the header menu when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     if (messagesContainerRef.current) {
@@ -297,18 +310,55 @@ const BettyAI = () => {
     }
   };
 
-  const clearChat = async () => {
-    if (!window.confirm('Are you sure? This will delete all chat history.')) return;
-    if (user?.id) {
-      try {
-        await supabase.from('betty_ai_messages').delete().eq('user_id', user.id);
-        await supabase.from('betty_conversations').delete().eq('user_id', user.id);
-      } catch (err) {
-        console.error('Error clearing Betty AI history:', err);
-      }
-    }
+  // Clear chat: UI only — saved history stays in the database
+  const clearChat = () => {
+    if (!window.confirm('Clear the conversation from this screen? Your saved history will be kept.')) return;
     setTechStack([]);
     setMessages([WELCOME_MESSAGE]);
+    setMenuOpen(false);
+    toast({ type: 'success', title: 'Chat cleared', body: 'Saved history was kept.' });
+  };
+
+  // Delete history: permanently removes everything from the database
+  const deleteHistory = async () => {
+    if (!user?.id) return;
+    if (!window.confirm('Permanently delete ALL Betty AI chat history? This cannot be undone.')) return;
+    try {
+      await supabase.from('betty_ai_messages').delete().eq('user_id', user.id);
+      await supabase.from('betty_conversations').delete().eq('user_id', user.id);
+      setTechStack([]);
+      setMessages([WELCOME_MESSAGE]);
+      toast({ type: 'success', title: 'History deleted', body: 'All Betty AI history was permanently removed.' });
+    } catch (err) {
+      console.error('Error deleting Betty AI history:', err);
+      toast({ type: 'notification', title: 'Delete failed', body: 'Could not delete history. Try again.' });
+    }
+    setMenuOpen(false);
+  };
+
+  // Export chat: download the full conversation as a .txt file
+  const exportChat = () => {
+    const lines = messages
+      .filter((m) => m.id !== 'welcome')
+      .map((m) => {
+        const who = m.from === 'betty' ? 'Betty AI' : user?.name || 'You';
+        return `[${formatTime(m.timestamp)}] ${who}:\n${m.text}\n`;
+      });
+    if (!lines.length) {
+      toast({ type: 'notification', title: 'Nothing to export', body: 'Your chat is empty.' });
+      return;
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `betty-ai-chat-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMenuOpen(false);
+    toast({ type: 'success', title: 'Chat exported', body: 'Saved as a .txt file.' });
   };
 
   const copyToClipboard = (text, id) => {
@@ -354,16 +404,54 @@ const BettyAI = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <div ref={menuRef} className="relative flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={clearChat}
               disabled={loading}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.03] text-white/40 hover:text-red-400/80 transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/[0.03] text-white/40 hover:text-violet-300/80 transition-all disabled:opacity-40"
               title="Clear chat"
             >
               <Trash2 className="w-4 h-4" />
               <span className="text-xs font-medium hidden sm:inline">Clear Chat</span>
             </button>
+
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                className="p-2 rounded-lg hover:bg-white/[0.03] text-white/40 hover:text-white/70 transition-all"
+                title="Chat options"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-48 rounded-xl glass-strong shadow-xl shadow-black/40 p-1.5 z-50"
+                  >
+                    <button
+                      onClick={exportChat}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.05] transition-all"
+                    >
+                      <Download className="w-4 h-4 text-violet-300" />
+                      Export chat
+                    </button>
+                    <button
+                      onClick={deleteHistory}
+                      disabled={loading}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-white/70 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-400/80" />
+                      Delete history
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <div className="hidden md:flex gap-1">
               {modes.map((m) => (
@@ -378,8 +466,8 @@ const BettyAI = () => {
                   ); }}
                   className={`px-3 py-1.5 rounded-lg text-[11px] transition-all ${
                     mode === m.id
-                      ? 'bg-violet-500/10 text-violet-300 border border-violet-500/25'
-                      : 'text-white/20 hover:text-white/40 hover:bg-white/[0.02]'
+                      ? 'bg-[#2b1b40] text-violet-200 border border-violet-500/40'
+                      : 'text-white/25 hover:text-white/50 hover:bg-white/[0.05]'
                   }`}
                 >
                   {m.label}
@@ -527,8 +615,8 @@ const BettyAI = () => {
                 }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs border transition-all ${
                   placeholder === action.placeholder && mode === action.mode
-                    ? 'border-violet-400/40 text-violet-300 bg-violet-500/10'
-                    : 'border-white/10 text-white/50 hover:text-white hover:border-violet-400/30'
+                    ? 'border-violet-400/50 text-violet-200 bg-[#2b1b40]'
+                    : 'border-white/10 text-white/50 hover:text-white hover:border-violet-400/30 bg-[#12141b]'
                 }`}
               >
                 {action.label}
@@ -542,7 +630,7 @@ const BettyAI = () => {
                 ref={inputRef}
                 rows={2}
                 placeholder={placeholder}
-                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-3.5 pr-12 text-sm text-white placeholder-white/30 focus:outline-none focus:border-violet-400/40 focus:bg-white/[0.06] transition-all resize-none disabled:opacity-40"
+                className="w-full bg-[#12141b] border border-white/10 rounded-xl px-4 py-3.5 pr-12 text-sm text-white placeholder-white/30 focus:outline-none focus:border-violet-400/40 transition-all resize-none disabled:opacity-40"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={!isAuthenticated}
@@ -555,7 +643,7 @@ const BettyAI = () => {
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/[0.03] transition-colors text-white/15 hover:text-violet-400/60"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/10 transition-colors text-white/15 hover:text-violet-400/60"
               >
                 <Mic className="w-4 h-4" />
               </button>

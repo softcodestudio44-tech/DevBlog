@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sendNotification } from '../lib/notify';
+import { isOnline, enqueueAction } from '../lib/offline';
 
 export const useDirectMessages = (otherUserId) => {
   const { user } = useAuth();
@@ -97,6 +98,33 @@ export const useDirectMessages = (otherUserId) => {
   const sendMessage = useCallback(
     async (content) => {
       if (!content?.trim() || !otherUserId || !user?.id) return null;
+
+      // Offline: queue the DM for sync and echo it locally
+      if (!isOnline()) {
+        const queuedAt = new Date().toISOString();
+        enqueueAction({
+          type: 'dm',
+          payload: {
+            content: content.trim(),
+            sender_id: user.id,
+            recipient_id: otherUserId,
+            created_at: queuedAt,
+          },
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `offline-${queuedAt}`,
+            content: content.trim(),
+            sender_id: user.id,
+            recipient_id: otherUserId,
+            created_at: queuedAt,
+            queued: true,
+            sender: { id: user.id, name: user.name, avatar: user.avatar },
+          },
+        ]);
+        return { id: `offline-${queuedAt}`, queued: true };
+      }
 
       try {
         const { data, error } = await supabase

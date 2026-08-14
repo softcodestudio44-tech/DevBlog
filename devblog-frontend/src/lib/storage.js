@@ -31,3 +31,8 @@ export const uploadAvatar = async (userId, file) => {
   const [url] = await uploadFiles('avatars', userId, [file]);
   return url;
 };
+
+export const uploadCover = async (userId, file) => {
+  const [url] = await uploadFiles('covers', userId, [file]);
+  return url;
+};

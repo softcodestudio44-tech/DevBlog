@@ -177,7 +177,7 @@ const Community = () => {
 
       {/* Sidebar */}
       <div className={`
-        fixed lg:static z-50 h-full w-80 lg:w-80 bg-[#0a0f0d]/98 backdrop-blur-xl 
+        fixed lg:static z-50 h-full w-80 lg:w-80 bg-[#0b0d12] 
         border-r border-white/5 flex flex-col flex-shrink-0
         transition-transform duration-300 ease-in-out
         ${showSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -260,7 +260,7 @@ const Community = () => {
         
         {/* Header */}
         {activeChannel && (
-          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
+          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0d0f16]">
             <button 
               onClick={() => setShowSidebar(true)} 
               className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50"
@@ -333,7 +333,7 @@ const Community = () => {
                       </div>
                     )}
                     <div className="relative">
-                      <div className={`px-4 py-3 rounded-3xl backdrop-blur-xl ${isOwn ? 'bg-primary/25 text-white rounded-br-sm' : 'bg-white/10 text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
+                      <div className={`px-4 py-3 rounded-3xl ${isOwn ? 'bg-[#3d2460] text-white rounded-br-sm' : 'bg-[#1a1d27] text-white/90 rounded-bl-sm border border-white/10 shadow-sm shadow-black/10'}`}>
                         <MarkdownRenderer content={msg.content} />
                       </div>
                       <div className="mt-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -356,7 +356,7 @@ const Community = () => {
 
         {/* Input */}
         {isAuthenticated ? (
-          <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
+          <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0d0f16]">
             {replyTo && (
               <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5">
                 <div className="flex items-start justify-between gap-3">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { isOnline, enqueueAction } from '../lib/offline';
 
 export const useMessages = (channelId) => {
   const { user } = useAuth();
@@ -91,6 +92,33 @@ export const useMessages = (channelId) => {
   const sendMessage = useCallback(
     async (content) => {
       if (!content?.trim() || !channelId || !user?.id) return null;
+
+      // Offline: queue the message and echo it locally
+      if (!isOnline()) {
+        const queuedAt = new Date().toISOString();
+        enqueueAction({
+          type: 'channel-message',
+          payload: {
+            content: content.trim(),
+            channel_id: channelId,
+            author_id: user.id,
+            created_at: queuedAt,
+          },
+        });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `offline-${queuedAt}`,
+            content: content.trim(),
+            channel_id: channelId,
+            author_id: user.id,
+            created_at: queuedAt,
+            queued: true,
+            author: { id: user.id, name: user.name, avatar: user.avatar },
+          },
+        ]);
+        return { id: `offline-${queuedAt}`, queued: true };
+      }
 
       try {
         const { data, error } = await supabase

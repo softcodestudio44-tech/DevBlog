@@ -4,7 +4,7 @@ import { Github, Facebook, Mail, Heart, MessageSquare, Sparkles, ExternalLink } 
 
 const Footer = () => {
   return (
-    <footer className="relative border-t border-white/[0.04] mt-auto" style={{ background: 'rgba(5, 6, 8, 0.9)', backdropFilter: 'blur(40px)' }}>
+    <footer className="relative border-t border-white/[0.04] mt-auto" style={{ background: '#050608' }}>
       {/* Subtle top glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[1px] bg-gradient-to-r from-transparent via-primary-500/20 to-transparent" />
       
@@ -14,11 +14,13 @@ const Footer = () => {
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-3 mb-4">
-              <img 
-                src="/logo.png" 
-                alt="DevBlog" 
-                className="w-10 h-10 rounded-xl object-cover"
-              />
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg shadow-black/20">
+                <img
+                  src="/logo.png?v=4"
+                  alt="DevBlog"
+                  className="w-8 h-8 object-contain"
+                />
+              </div>
               <span className="text-lg font-bold gradient-text">DevBlog</span>
             </div>
             <p className="text-sm text-white/25 leading-relaxed">

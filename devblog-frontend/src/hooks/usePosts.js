@@ -1,19 +1,46 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { isOnline, cachePosts, getCachedPosts, enqueueAction } from '../lib/offline';
 
 export const usePosts = () => {
   const { user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 10;
 
-  // Fetch all published posts with author info
-  const fetchPosts = useCallback(async () => {
-    setLoading(true);
+  // Publish any scheduled posts whose time has come
+  const publishScheduled = useCallback(async () => {
+    try {
+      await supabase.rpc('publish_scheduled_posts');
+    } catch (err) {
+      console.error('Error publishing scheduled posts:', err);
+    }
+  }, []);
+
+  // Fetch a page of published posts with author info
+  const fetchPage = useCallback(async ({ reset = true } = {}) => {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     setError(null);
 
     try {
+      await publishScheduled();
+
+      // Offline: fall back to the last cached feed
+      if (!isOnline()) {
+        const cached = getCachedPosts();
+        setPosts((prev) => (reset ? cached : [...prev, ...cached.slice(prev.length)]));
+        setHasMore(false);
+        return;
+      }
+
+      const from = reset ? 0 : posts.length;
+      const to = from + PAGE_SIZE - 1;
+
       const { data, error } = await supabase
         .from('posts')
         .select(`
@@ -23,7 +50,8 @@ export const usePosts = () => {
           comments:comments(count)
         `)
         .eq('is_draft', false)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
 
@@ -36,18 +64,23 @@ export const usePosts = () => {
         comments: undefined,
       }));
 
-      setPosts(transformed);
+      if (reset && transformed.length) cachePosts(transformed);
+
+      setPosts((prev) => (reset ? transformed : [...prev, ...transformed]));
+      setHasMore((data || []).length === PAGE_SIZE);
     } catch (err) {
       console.error('Error fetching posts:', err);
-      setError(err.message);
+      if (reset && isOnline()) setError(err.message);
+      else setPosts((prev) => (prev.length ? prev : getCachedPosts()));
     } finally {
-      setLoading(false);
+      if (reset) setLoading(false);
+      else setLoadingMore(false);
     }
-  }, []);
+  }, [publishScheduled, posts.length]);
 
   // Subscribe to new posts, likes, and comments
   useEffect(() => {
-    fetchPosts();
+    fetchPage();
 
     const channel = supabase
       .channel('posts-realtime')
@@ -155,11 +188,11 @@ export const usePosts = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchPosts]);
+  }, [fetchPage]);
 
   // Create a post
   const createPost = useCallback(
-    async ({ title, content, tags, images }) => {
+    async ({ title, content, tags, images, isDraft = false, scheduledAt = null }) => {
       if (!user?.id) return { data: null, error: 'Not authenticated' };
 
       try {
@@ -170,7 +203,8 @@ export const usePosts = () => {
             content,
             tags: tags || [],
             images: images || [],
-            is_draft: false,
+            is_draft: isDraft,
+            scheduled_at: scheduledAt,
             author_id: user.id,
           })
           .select(`
@@ -234,6 +268,12 @@ export const usePosts = () => {
     async (postId) => {
       if (!user?.id) return { data: null, error: 'Not authenticated' };
 
+      // Offline: queue the like and report success optimistically
+      if (!isOnline()) {
+        enqueueAction({ type: 'like', payload: { post_id: postId, user_id: user.id } });
+        return { data: { liked: true, queued: true }, error: null };
+      }
+
       try {
         // Check if already liked
         const { data: existing } = await supabase
@@ -287,13 +327,16 @@ export const usePosts = () => {
   return {
     posts,
     loading,
+    loadingMore,
     error,
+    hasMore,
     createPost,
     updatePost,
     deletePost,
     toggleLike,
     hasLiked,
-    refresh: fetchPosts,
+    refresh: () => fetchPage({ reset: true }),
+    loadMore: () => fetchPage({ reset: false }),
   };
 };
 

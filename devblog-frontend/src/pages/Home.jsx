@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  Clock, Search, X, MessageCircle, BookOpen, PenLine, Share2, Check, Flame
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Clock, Search, X, MessageCircle, BookOpen, PenLine, Share2, Check, Flame, Heart, RefreshCw
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { usePosts } from '../hooks/usePosts';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import LikeButton from '../components/LikeButton';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = [
   { name: 'All', tag: 'tag-blue' },
@@ -46,158 +48,50 @@ const tagColorFor = (tag = '') => {
   return 'tag-blue';
 };
 
+const PULL_THRESHOLD = 70;
+
 const Home = () => {
   const { isAuthenticated } = useAuth();
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { posts, loading, loadingMore, hasMore, refresh, loadMore } = usePosts();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [copiedId, setCopiedId] = useState(null);
+  const [burst, setBurst] = useState(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
+  const lastTapRef = useRef(0);
+  const navTimerRef = useRef(null);
+  const touchStartYRef = useRef(0);
+  const pullingRef = useRef(false);
+  const sentinelRef = useRef(null);
+  const scrollYRef = useRef(0);
+
+  // Track scroll position for pull-to-refresh
   useEffect(() => {
-    fetchPosts();
+    const onScroll = () => { scrollYRef.current = window.scrollY; };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Subscribe to real-time post updates
+  // Infinite scroll
   useEffect(() => {
-    const channel = supabase
-      .channel('home-posts')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'posts',
-          filter: 'is_draft=eq.false',
-        },
-        async (payload) => {
-          const { data } = await supabase
-            .from('posts')
-            .select(`
-              *,
-              author:profiles!posts_author_id_fkey(id, name, avatar, email),
-              likes:likes(count),
-              comments:comments(count)
-            `)
-            .eq('id', payload.new.id)
-            .single();
-          
-          if (data) {
-            setPosts((prev) => {
-              if (prev.find((p) => p.id === data.id)) return prev;
-              return [{
-                ...data,
-                likeCount: data.likes?.[0]?.count || 0,
-                commentCount: data.comments?.[0]?.count || 0,
-                likes: undefined,
-                comments: undefined,
-              }, ...prev];
-            });
-          }
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadMore();
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'posts',
-        },
-        (payload) => {
-          setPosts((prev) => prev.filter((post) => post.id !== payload.old.id));
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'likes',
-        },
-        (payload) => {
-          const { post_id } = payload.new;
-          setPosts((prev) =>
-            prev.map((post) =>
-              post.id === post_id
-                ? { ...post, likeCount: (post.likeCount || 0) + 1 }
-                : post
-            )
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'likes',
-        },
-        (payload) => {
-          const { post_id } = payload.old;
-          setPosts((prev) =>
-            prev.map((post) =>
-              post.id === post_id
-                ? { ...post, likeCount: Math.max(0, (post.likeCount || 0) - 1) }
-                : post
-            )
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'comments',
-        },
-        (payload) => {
-          const { post_id } = payload.new;
-          setPosts((prev) =>
-            prev.map((post) =>
-              post.id === post_id
-                ? { ...post, commentCount: (post.commentCount || 0) + 1 }
-                : post
-            )
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchPosts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          author:profiles!posts_author_id_fkey(id, name, avatar, email),
-          likes:likes(count),
-          comments:comments(count)
-        `)
-        .eq('is_draft', false)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const transformed = (data || []).map((post) => ({
-        ...post,
-        likeCount: post.likes?.[0]?.count || 0,
-        commentCount: post.comments?.[0]?.count || 0,
-        likes: undefined,
-        comments: undefined,
-      }));
-
-      setPosts(transformed);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadMore]);
 
   const filteredPosts = posts.filter((post) => {
     const matchesSearch =
@@ -234,10 +128,87 @@ const Home = () => {
     }
   };
 
+  const triggerLike = useCallback((post) => {
+    if (!isAuthenticated) return;
+    setBurst({ postId: post.id, key: Date.now() });
+    window.dispatchEvent(new CustomEvent('devblog:like', { detail: { postId: post.id } }));
+  }, [isAuthenticated]);
+
+  // Double-tap like (touch) with delayed navigation so the first tap can be cancelled
+  const handleArticleTouchEnd = (e, post) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 400) {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
+      e.preventDefault();
+      e.stopPropagation();
+      triggerLike(post);
+      lastTapRef.current = 0;
+      return;
+    }
+    lastTapRef.current = now;
+    if (navTimerRef.current) clearTimeout(navTimerRef.current);
+    navTimerRef.current = setTimeout(() => navigate(`/post/${post.id}`), 380);
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Double-click like (desktop); single click on the card body navigates
+  const handleArticleClick = (e, post) => {
+    if (e.detail === 2) {
+      triggerLike(post);
+      return;
+    }
+    if (e.target.closest('a, button')) return;
+    navigate(`/post/${post.id}`);
+  };
+
+  // Pull to refresh
+  const handleTouchStart = (e) => {
+    touchStartYRef.current = e.touches[0].clientY;
+    pullingRef.current = false;
+    setPullDistance(0);
+  };
+
+  const handleTouchMove = (e) => {
+    if (scrollYRef.current > 0) return;
+    const deltaY = e.touches[0].clientY - touchStartYRef.current;
+    if (deltaY > 0) {
+      pullingRef.current = true;
+      setPullDistance(Math.min(deltaY * 0.5, 110));
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullingRef.current && pullDistance >= PULL_THRESHOLD && !refreshing) {
+      setRefreshing(true);
+      setPullDistance(64);
+      await refresh();
+      setRefreshing(false);
+      toast({ type: 'success', title: 'Feed updated', body: 'Showing the latest posts.' });
+    } else {
+      setPullDistance(0);
+    }
+    pullingRef.current = false;
+  };
+
   const isFiltering = searchQuery || activeCategory !== 'All';
 
   return (
-    <div className="app-column px-4 pb-10">
+    <div
+      className="app-column px-4 pb-10"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      <motion.div
+        animate={{ height: pullDistance > 0 ? pullDistance : 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+        className="overflow-hidden flex items-center justify-center text-white/40"
+      >
+        <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+      </motion.div>
+
       {/* App header */}
       <header className="pt-5 pb-4">
         <div className="flex items-center justify-between mb-4">
@@ -354,11 +325,36 @@ const Home = () => {
             const isFeatured = !isFiltering && index === 0;
             const gradient = avatarGradient(post.author_id);
             return (
-              <article key={post.id} className={isFeatured ? 'p-[1.5px] rounded-[20px] bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/10' : ''}>
+              <article
+                key={post.id}
+                className={`relative ${isFeatured ? 'p-[1.5px] rounded-[20px] bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/10' : ''}`}
+                onTouchEnd={(e) => handleArticleTouchEnd(e, post)}
+                onClick={(e) => handleArticleClick(e, post)}
+              >
+                {/* Double-tap heart burst */}
+                <AnimatePresence>
+                  {burst?.postId === post.id && (
+                    <motion.div
+                      key={burst.key}
+                      initial={{ opacity: 0, scale: 0.4 }}
+                      animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.4, 1, 1.3], y: [0, -20, -50] }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.7 }}
+                      className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    >
+                      <Heart className="w-20 h-20 text-pink-400 fill-pink-400 drop-shadow-[0_0_20px_rgba(244,114,182,0.8)]" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className={`panel p-4 h-full transition-colors ${isFeatured ? 'rounded-[19px] bg-[#0b0d14]' : 'hover:border-white/[0.12]'}`}>
                   {/* Author */}
                   <div className="flex items-center gap-3 mb-3">
-                    <Link to={`/user/${post.author_id}`} className="hover:opacity-80 transition-opacity flex-shrink-0">
+                    <Link
+                      to={`/user/${post.author_id}`}
+                      className="hover:opacity-80 transition-opacity flex-shrink-0"
+                      onTouchEnd={(e) => e.stopPropagation()}
+                    >
                       {post.author?.avatar ? (
                         <img
                           src={post.author.avatar}
@@ -376,6 +372,7 @@ const Home = () => {
                         <Link
                           to={`/user/${post.author_id}`}
                           className="text-sm font-semibold text-white hover:text-violet-300 transition-colors truncate"
+                          onTouchEnd={(e) => e.stopPropagation()}
                         >
                           {post.author?.name || 'Unknown'}
                         </Link>
@@ -399,17 +396,15 @@ const Home = () => {
                   </div>
 
                   {/* Content */}
-                  <Link to={`/post/${post.id}`} className="block group">
-                    <h2 className="text-base font-semibold text-white leading-snug mb-1.5 group-hover:text-violet-300 transition-colors">
-                      <MarkdownRenderer content={post.title} />
-                    </h2>
-                    <p className="text-sm text-white/50 leading-relaxed line-clamp-3">
-                      {post.content}
-                    </p>
-                  </Link>
+                  <h2 className="text-base font-semibold text-white leading-snug mb-1.5 group-hover:text-violet-300 transition-colors">
+                    <MarkdownRenderer content={post.title} />
+                  </h2>
+                  <p className="text-sm text-white/50 leading-relaxed line-clamp-3">
+                    {post.content}
+                  </p>
 
                   {post.images && post.images.length > 0 && (
-                    <Link to={`/post/${post.id}`} className="mt-3 block">
+                    <div className="mt-3">
                       <div className="rounded-xl overflow-hidden bg-white/5 border border-white/5">
                         <img
                           src={post.images[0]}
@@ -418,18 +413,19 @@ const Home = () => {
                           loading="lazy"
                         />
                       </div>
-                    </Link>
+                    </div>
                   )}
 
                   {/* Actions */}
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.06]">
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()}>
                       <LikeButton postId={post.id} authorId={post.author_id} initialCount={post.likeCount || 0} />
                     </div>
                     <div className="flex items-center gap-3">
                       <Link
                         to={`/post/${post.id}`}
                         className="flex items-center gap-1.5 text-white/40 hover:text-violet-300 transition-colors text-sm"
+                        onTouchEnd={(e) => e.stopPropagation()}
                       >
                         <MessageCircle className="w-[18px] h-[18px]" />
                         <span>{post.commentCount || 0}</span>
@@ -438,6 +434,7 @@ const Home = () => {
                         onClick={() => handleShare(post)}
                         className="flex items-center gap-1.5 text-white/40 hover:text-violet-300 transition-colors text-sm"
                         title="Copy link"
+                        onTouchEnd={(e) => e.stopPropagation()}
                       >
                         {copiedId === post.id ? (
                           <Check className="w-[18px] h-[18px] text-emerald-400" />
@@ -445,18 +442,29 @@ const Home = () => {
                           <Share2 className="w-[18px] h-[18px]" />
                         )}
                       </button>
-                      <Link
-                        to={`/post/${post.id}`}
-                        className="text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors"
-                      >
-                        Read
-                      </Link>
                     </div>
                   </div>
                 </div>
               </article>
             );
           })}
+
+          {/* Infinite scroll sentinel */}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex items-center justify-center py-6">
+              {loadingMore ? (
+                <div className="flex items-center gap-2 text-white/40 text-sm">
+                  <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                  Loading more...
+                </div>
+              ) : (
+                <p className="text-xs text-white/25">Scroll for more</p>
+              )}
+            </div>
+          )}
+          {!hasMore && posts.length > 0 && (
+            <p className="text-center text-xs text-white/25 py-6">You're all caught up</p>
+          )}
         </div>
       )}
     </div>

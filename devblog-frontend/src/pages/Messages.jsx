@@ -256,7 +256,7 @@ const Messages = () => {
 
       {/* Sidebar */}
       <div className={`
-        fixed lg:static z-50 h-full w-80 lg:w-80 bg-[#0a0f0d]/98 backdrop-blur-xl 
+        fixed lg:static z-50 h-full w-80 lg:w-80 bg-[#0b0d12] 
         border-r border-white/5 flex flex-col flex-shrink-0
         transition-transform duration-300 ease-in-out
         ${showSidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -269,7 +269,7 @@ const Messages = () => {
         </div>
         
         <div className="flex flex-col h-full">
-          <div className="glass p-4 mb-4 rounded-3xl shadow-inner shadow-black/20 border border-primary/20 bg-slate-900/80">
+          <div className="p-4 mb-4 rounded-3xl shadow-lg shadow-black/30 border border-primary/20 bg-[#0d0f16]">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary flex items-center justify-center shadow-lg shadow-blue-500/20">
                 <MessageCircle className="w-5 h-5 text-white" />
@@ -359,7 +359,7 @@ const Messages = () => {
         
         {/* Header */}
         {!activeDMUser ? (
-          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
+          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0d0f16]">
             <button onClick={() => setShowSidebar(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50">
               <Menu className="w-5 h-5" />
             </button>
@@ -372,7 +372,7 @@ const Messages = () => {
             </div>
           </div>
         ) : (
-          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
+          <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 bg-[#0d0f16]">
             <button onClick={() => setShowSidebar(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/5 text-white/50">
               <Menu className="w-5 h-5" />
             </button>
@@ -464,10 +464,10 @@ const Messages = () => {
                     {!isFirstInGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
 
                     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} relative group`}>
-                      <div className={`px-4 py-2 rounded-3xl backdrop-blur-xl ${
+                      <div className={`px-4 py-2 rounded-3xl ${
                         isOwn
-                          ? 'bg-primary/25 text-white rounded-tr-sm'
-                          : 'bg-white/10 text-white/90 rounded-tl-sm border border-white/10 shadow-sm shadow-black/10'
+                          ? 'bg-[#3d2460] text-white rounded-tr-sm'
+                          : 'bg-[#1a1d27] text-white/90 rounded-tl-sm border border-white/10 shadow-sm shadow-black/10'
                       }`}>
                         <MarkdownRenderer content={msg.content} />
                       </div>
@@ -496,7 +496,7 @@ const Messages = () => {
 
         {/* Input */}
         {isAuthenticated ? (
-          <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0a0f0d]/90 backdrop-blur-sm">
+          <div className="px-4 py-3 border-t border-white/5 flex-shrink-0 bg-[#0d0f16]">
             {replyTo && (
               <div className="mb-2 px-4 py-2 rounded-2xl border border-white/10 bg-white/5">
                 <div className="flex items-start justify-between gap-3">

@@ -92,6 +92,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const signInWithOAuth = async (provider) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({ provider });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  };
+
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -128,6 +138,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       signUp,
       signIn,
+      signInWithOAuth,
       logout,
       updateProfile,
       fetchProfile,
