@@ -274,20 +274,29 @@ const EditProfile = () => {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-neon w-full flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-primary-300 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Save Changes
-                </>
-              )}
-            </button>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/user/${user?.id}`)}
+                className="btn-secondary flex-1 px-5 py-3 flex items-center justify-center text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-neon flex-1 px-5 py-3 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-primary-300 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </motion.div>
       </div>

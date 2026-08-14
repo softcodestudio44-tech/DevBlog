@@ -163,8 +163,8 @@ body {
 /* ===== Dark Form Inputs ===== */
 .input-glass {
   width: 100%;
-  background-color: #1a1a2e;
-  border: 1px solid #374151;
+  background-color: #12141b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #ffffff;
   border-radius: 12px;
   padding: 10px 14px;
@@ -173,14 +173,14 @@ body {
 }
 
 .input-glass::placeholder {
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .input-glass:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 1px #3b82f6;
-  background-color: #1a1a2e;
+  border-color: #a855f7;
+  box-shadow: 0 0 0 1px #a855f7;
+  background-color: #12141b;
 }
 
 /* ===== Loading Shimmer ===== */

@@ -113,6 +113,8 @@ const Ribbons = () => (
 const AnimatedBackground = () => {
   const { pathname } = useLocation();
   const isAuth = ['/login', '/register', '/forgot-password'].includes(pathname);
+  // Profile pages get a clean background so no code text sits behind the cards
+  const isProfile = pathname.startsWith('/user/');
 
   return (
     <div className={`animated-bg ${isAuth ? 'auth' : 'main'}`}>
@@ -120,6 +122,11 @@ const AnimatedBackground = () => {
         <>
           <div className="auth-base" />
           <Ribbons />
+          <div className="bg-vignette" />
+        </>
+      ) : isProfile ? (
+        <>
+          <div className="tech-base" />
           <div className="bg-vignette" />
         </>
       ) : (

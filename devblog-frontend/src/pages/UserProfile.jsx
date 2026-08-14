@@ -233,12 +233,18 @@ const UserProfile = () => {
         comments: undefined,
       }));
 
+      const likeCount = (postsData || []).reduce(
+        (sum, post) => sum + (post.likes?.[0]?.count || 0),
+        0
+      );
+
       setProfile({
         ...profileData,
         isAdmin: profileData.email === 'sofcodestudio44@gmail.com' || profileData.role === 'admin',
         postCount: postCount || 0,
         followersCount: followersCount || 0,
         followingCount: followingCount || 0,
+        likeCount,
         isFollowing,
         followersList: (followersData || []).map(f => f.follower),
         followingList: (followingData || []).map(f => f.following),
@@ -463,7 +469,7 @@ const UserProfile = () => {
                 <div className="hidden absolute inset-0 bg-gradient-to-r from-[#3B82F6]/25 to-transparent items-center justify-center" />
               </div>
             ) : (
-              <div className="absolute top-0 left-0 right-0 h-32 sm:h-40 bg-gradient-to-r from-[#3B82F6]/25 to-transparent" />
+              <div className="absolute top-0 left-0 right-0 h-32 sm:h-40 bg-gradient-to-br from-primary-600/40 via-violet-500/25 to-cyan-400/20" />
             )}
 
             <div className="relative pt-16 px-4 pb-6">
@@ -564,7 +570,7 @@ const UserProfile = () => {
                             href={fullUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-sm text-white/60 ${color} hover:bg-white/5 transition-all`}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-sm text-white/60 ${color} hover:bg-white/10 hover:scale-[1.04] hover:-translate-y-0.5 transition-all`}
                           >
                             <Icon className="w-4 h-4" />
                             <span>{label}</span>
@@ -631,8 +637,12 @@ const UserProfile = () => {
               Activity
             </h2>
             {activity.length === 0 ? (
-              <GlassCard className="text-center py-8">
-                <p className="text-white/40 text-sm">No recent activity</p>
+              <GlassCard className="text-center py-12">
+                <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
+                  <ActivityIcon className="w-6 h-6 text-primary-400" />
+                </div>
+                <p className="text-white/70 font-medium">No activity yet</p>
+                <p className="text-xs text-white/40 mt-1">Posts, likes, and comments will appear here</p>
               </GlassCard>
             ) : (
               <div className="space-y-3">
@@ -714,7 +724,13 @@ const UserProfile = () => {
 
           {posts.length === 0 ? (
             <GlassCard className="text-center py-12">
-              <p className="text-white/60">No posts yet</p>
+              <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
+                <PenLine className="w-6 h-6 text-primary-400" />
+              </div>
+              <p className="text-white/70 font-medium">No posts yet</p>
+              {isOwnProfile && (
+                <p className="text-xs text-white/40 mt-1">Share something with the community</p>
+              )}
             </GlassCard>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -864,7 +880,7 @@ const UserProfile = () => {
                   ))
                 ) : (
                   <p className="text-center text-white/40 py-8">
-                    No {showModal} yet
+                    {showModal === 'following' ? 'Not following anyone yet' : 'No followers yet'}
                   </p>
                 )}
               </div>
@@ -1046,11 +1062,18 @@ const UserProfile = () => {
                 </div>
               </div>
 
-              <div className="p-4 border-t border-white/10">
+              <div className="p-4 border-t border-white/10 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="btn-secondary flex-1 px-4 py-2.5 flex items-center justify-center text-sm font-medium disabled:opacity-50"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="btn-neon w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="btn-neon flex-1 px-4 py-2.5 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
                   {savingEdit ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
